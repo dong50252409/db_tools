@@ -11,7 +11,40 @@
 -include("db_tools.hrl").
 
 %% API
--export([set_config_filename/1, get_config_filename/0, set_db_host/1, get_db_host/0, set_db_port/1, get_db_port/0, set_db_user/1, get_db_user/0, set_db_passwd/1, get_db_passwd/0, set_db_name/1, get_db_name/0, get_export/0, set_export/1, set_verbose/0, is_verbose/0, set_db_conn/1, get_db_conn/0]).
+-export([
+    set_verbose/0, is_verbose/0,
+    set_db_character/1, get_db_character/0,
+    set_db_collation/1, get_db_collation/0,
+    set_config_filename/1, get_config_filename/0,
+    set_db_host/1, get_db_host/0,
+    set_db_port/1, get_db_port/0,
+    set_db_user/1, get_db_user/0,
+    set_db_passwd/1, get_db_passwd/0,
+    set_db_name/1, get_db_name/0,
+    set_export_filename/1, get_export_filename/0,
+    set_db_conn/1, get_db_conn/0
+]).
+
+set_verbose() ->
+    put(verbose, true).
+
+is_verbose() ->
+    get(verbose) =:= true.
+
+set_db_character(DBCharacter) ->
+    put(db_character, DBCharacter),
+    ok.
+
+get_db_character() ->
+    get(db_character).
+
+set_db_collation(DBCollation) ->
+    put(db_collation, DBCollation),
+    ok.
+
+get_db_collation() ->
+    get(db_collation).
+
 
 set_config_filename(Filename) ->
     put(config_filename, Filename),
@@ -57,23 +90,17 @@ get_db_passwd() ->
 set_db_name(DBName) when is_list(DBName) ->
     put(db_name, DBName);
 set_db_name(Config) when is_tuple(Config) ->
-    get_db_name() =:= undefined andalso put(db_name, element(1, Config)).
+    get_db_name() =:= undefined andalso put(db_name, unicode:characters_to_binary(atom_to_binary(element(1, Config)))).
 
 get_db_name() ->
     get(db_name).
 
-get_export() ->
-    get(export_filename).
-
-set_export(Filename) ->
+set_export_filename(Filename) ->
     {ok, IO} = file:open(Filename, [write]),
     put(export_filename, IO).
 
-set_verbose() ->
-    put(verbose, true).
-
-is_verbose() ->
-    get(verbose) =:= true.
+get_export_filename() ->
+    get(export_filename).
 
 set_db_conn(Conn) ->
     put(db_conn, Conn).

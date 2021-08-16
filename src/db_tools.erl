@@ -23,7 +23,6 @@ main(Args) ->
                 db_tools_dict:set_db_name(Config),
                 db_tools_operation:do_connect_db(),
                 db_tools_operation:do_create_db(),
-                db_tools_operation:do_use_database(),
                 db_tools_operation:do_create_tables(Config),
                 db_tools_operation:do_alter_tables(Config)
             catch
@@ -48,10 +47,10 @@ get_filename() ->
     Config.
 
 do_export_db(SQL) ->
-    file:write(db_tools_dict:get_export(), <<SQL/binary, "\n\n">>).
+    file:write(db_tools_dict:get_export_filename(), <<SQL/binary, "\n\n">>).
 
 do_close_export() ->
-    case db_tools_dict:get_export() of
+    case db_tools_dict:get_export_filename() of
         undefined ->
             ok;
         IO when is_pid(IO) ->

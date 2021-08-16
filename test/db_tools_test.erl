@@ -36,7 +36,7 @@ parse_args_test() ->
     ?assertMatch(DBUser, db_tools_dict:get_db_user()),
     ?assertMatch(DBPasswd, db_tools_dict:get_db_passwd()),
     ?assertMatch(DBName, db_tools_dict:get_db_name()),
-    ?assertMatch(ExportFilename, db_tools_dict:get_export()),
+    ?assertMatch(ExportFilename, db_tools_dict:get_export_filename()),
     ?assert(db_tools_dict:is_verbose()).
 
 help_test() ->

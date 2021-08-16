@@ -11,7 +11,7 @@
 -include("db_tools.hrl").
 
 %% API
--export([do_connect_db/0, do_create_db/0, do_use_database/0, do_create_tables/1, do_alter_tables/1]).
+-export([do_connect_db/0, do_create_db/0, do_create_tables/1, do_alter_tables/1]).
 
 query(SQL) ->
     query(SQL, []).
@@ -20,8 +20,38 @@ query(SQL, Params) ->
     Conn = db_tools_dict:get_db_conn(),
     BinSQL = unicode:characters_to_binary(SQL),
     Result = ?CHECK(mysql:query(Conn, BinSQL, Params)),
+    Result.
+
+execute(SQL) ->
+    execute(SQL, []).
+execute(SQL, Params) ->
+    ?VERBOSE("SQL:~ts~n Parmas:~w", [SQL, Params]),
+    Conn = db_tools_dict:get_db_conn(),
+    BinSQL = unicode:characters_to_binary(SQL),
+    Result = ?CHECK(mysql:query(Conn, BinSQL, Params)),
     db_tools:do_export_db(BinSQL),
     Result.
+
+get_table_options(TableInfo) ->
+    ?CHECK(?GET_VALUE(table, TableInfo, {error, <<"未指定表选项，请检查"/utf8>>})).
+
+get_table_name(TableInfo) ->
+    TableOptions = get_table_options(TableInfo),
+    AtomTableName = ?CHECK(?GET_VALUE(name, TableOptions, {error, <<"未指定表名，请检查"/utf8>>})),
+    unicode:characters_to_binary(atom_to_binary(AtomTableName)).
+
+get_table_fields(TableInfo) ->
+    ?CHECK(?GET_VALUE(fields, TableInfo, {error, <<"未指定表字段列，请检查"/utf8>>})).
+
+get_field_name(Field) ->
+    AtomFieldName = ?CHECK(?GET_VALUE(name, Field, {error, <<"未指定字段name选项，请检查"/utf8>>})),
+    unicode:characters_to_binary(atom_to_binary(AtomFieldName)).
+
+get_field_type(Field) ->
+    ?CHECK(?GET_VALUE(type, Field, {error, <<"未指定type选项，请检查"/utf8>>})).
+
+get_table_index_list(TableInfo) ->
+    ?GET_VALUE(index, TableInfo, []).
 
 do_connect_db() ->
     Args = [
@@ -39,141 +69,172 @@ do_connect_db() ->
     ok.
 
 do_create_db() ->
-    DBName = db_tools_dict:get_db_name(),
-    SQL = io_lib:format("CREATE DATABASE IF NOT EXISTS `~s`;", [DBName]),
-    query(SQL).
+    DBNameStr = db_tools_dict:get_db_name(),
+    SQL = io_lib:format("SELECT `SCHEMA_NAME` FROM `information_schema`.`SCHEMATA` WHERE `SCHEMA_NAME`='~ts';", [DBNameStr]),
+    case query(SQL) of
+        {ok, _Fields, [[DBNameStr | _]]} ->
+            ok;
+        {ok, _Fields, _Values} ->
+            CreateDBSQL = io_lib:format("CREATE DATABASE `~ts` ~ts;", [DBNameStr, get_db_options()]),
+            execute(CreateDBSQL)
+    end.
 
-do_use_database() ->
-    Conn = db_tools_dict:get_db_conn(),
-    DBUser = db_tools_dict:get_db_user(),
-    DBPasswd = db_tools_dict:get_db_passwd(),
-    Args = [{database, atom_to_list(db_tools_dict:get_db_name())}],
-    mysql:change_user(Conn, DBUser, DBPasswd, Args),
-    ok.
+get_db_options() ->
+    OptionsList = get_db_option([character, collation]),
+    lists:flatten(lists:join(" ", OptionsList)).
+
+get_db_option([character | T]) ->
+    case db_tools_dict:get_db_character() of
+        undefined ->
+            get_db_option(T);
+        Character ->
+            [["DEFAULT CHARACTER SET ", Character] | get_db_option(T)]
+    end;
+get_db_option([collation | T]) ->
+    case db_tools_dict:get_db_collation() of
+        undefined ->
+            get_db_option(T);
+        Collation ->
+            [["DEFAULT COLLATE ", Collation] | get_db_option(T)]
+    end;
+get_db_option([]) ->
+    [].
 
 do_create_tables({_, Tables}) ->
     Fun = fun(TableInfo) -> do_create_table(TableInfo) end,
     lists:foreach(Fun, Tables).
 
 do_create_table(TableInfo) ->
-    TableName = get_table_name(TableInfo),
-    FieldsStr = get_fields(TableName, TableInfo),
-    IndexStr = get_index_list(TableInfo),
-    Options = get_options(TableInfo),
-    {SQL, Args} = {"CREATE TABLE IF NOT EXISTS `~ts` (~n~ts", [TableName, FieldsStr]},
-    {SQL1, Args1} = ?IF(IndexStr =:= [], {SQL ++ "~n) ", Args}, {SQL ++ ",~n~ts\n) ", Args ++ [IndexStr]}),
-    {SQL2, Args2} = ?IF(Options =:= [], {SQL1 ++ ";", Args1}, {SQL1 ++ "~ts;", Args1 ++ [Options]}),
-    SQL4 = io_lib:format(SQL2, Args2),
-    query(SQL4).
+    TableNameStr = get_table_name(TableInfo),
+    case is_not_table_exist(TableNameStr) of
+        true ->
+            DBNameStr = db_tools_dict:get_db_name(),
+            FieldsStr = get_fields(TableInfo),
+            IndexLStr = get_index_list(TableInfo),
+            Options = get_options(TableInfo),
+            {SQL, Args} = {"CREATE TABLE `~ts`.`~ts` (~n~ts", [DBNameStr, TableNameStr, FieldsStr]},
+            {SQL1, Args1} = ?IF(IndexLStr =:= [], {SQL ++ "~n) ", Args}, {SQL ++ ",~n~ts\n) ", Args ++ [IndexLStr]}),
+            {SQL2, Args2} = ?IF(Options =:= [], {SQL1 ++ ";", Args1}, {SQL1 ++ "~ts;", Args1 ++ [Options]}),
+            SQL4 = io_lib:format(SQL2, Args2),
+            execute(SQL4);
+        false ->
+            ok
+    end.
 
-get_table_name(TableInfo) ->
-    TableOptions = ?CHECK(proplists:get_value(table, TableInfo, {error, <<"配置表未指定表选项"/utf8>>})),
-    ?CHECK(proplists:get_value(name, TableOptions, {error, <<"配置表未指定表名"/utf8>>})).
+is_not_table_exist(TableNameStr) ->
+    DBNameStr = db_tools_dict:get_db_name(),
+    SQL = io_lib:format("SELECT `TABLE_NAME` FROM `information_schema`.`TABLES` WHERE `TABLE_SCHEMA`='~ts' AND `TABLE_NAME`='~ts';",
+        [DBNameStr, TableNameStr]),
+    case query(SQL) of
+        {ok, _Fields, [[TableNameStr | _]]} ->
+            false;
+        {ok, _Fields, _} ->
+            true
+    end.
 
-get_fields(TableName, TableInfo) ->
-    Fields = ?CHECK(proplists:get_value(fields, TableInfo, {error, <<"配置表未指定表字段列"/utf8>>})),
-    TableNameStr = unicode:characters_to_binary(db_tools_util:any_to_list(TableName)),
-    lists:flatten(lists:join(",\n", get_fields_1(TableNameStr, Fields))).
+get_fields(TableInfo) ->
+    try
+        Fields = get_table_fields(TableInfo),
+        lists:flatten(lists:join(",\n", [["\t", Str] || Str <- concat_fields(Fields)]))
+    catch
+        throw:Reason ->
+            TableNameStr = get_table_name(TableInfo),
+            throw(<<"表："/utf8, TableNameStr/binary, " ", Reason/binary>>)
+    end.
 
-get_fields_1(TableName, [Field | T]) ->
-    Result = concat_fields(TableName, Field, [name, type, not_null, default, auto_inc, comment]),
-    [["\t", lists:join(" ", Result)] | get_fields_1(TableName, T)];
-get_fields_1(_TableName, []) ->
+concat_fields([Field | T]) ->
+    Result = concat_field(Field, [name, type, not_null, default, auto_inc, comment]),
+    [lists:join(" ", Result) | concat_fields(T)];
+concat_fields([]) ->
     [].
 
-concat_fields(TableName, Field, [name | T]) ->
-    Name = ?CHECK(proplists:get_value(name, Field, {error, <<"表："/utf8, TableName/binary, " 未指定name选项，请检查"/utf8>>})),
-    [["`", atom_to_list(Name), "`"] | concat_fields(TableName, Field, T)];
-concat_fields(TableName, Field, [type | T]) ->
-    Type = ?CHECK(proplists:get_value(type, Field, {error, <<"表："/utf8, TableName/binary, " 未指定type选项，请检查"/utf8>>})),
-    [[Type] | concat_fields(TableName, Field, T)];
-concat_fields(TableName, Field, [not_null | T]) ->
-    ?IF(proplists:is_defined(not_null, Field), ["NOT NULL"], []) ++ concat_fields(TableName, Field, T);
-concat_fields(TableName, Field, [default | T]) ->
-    case proplists:get_value(default, Field) of
+concat_field(ConfField, [name | T]) ->
+    NameStr = get_field_name(ConfField),
+    [["`", NameStr, "`"] | concat_field(ConfField, T)];
+concat_field(ConfField, [type | T]) ->
+    Type = get_field_type(ConfField),
+    [[Type] | concat_field(ConfField, T)];
+concat_field(ConfField, [not_null | T]) ->
+    ?IF(?IS_DEFINED(not_null, ConfField), ["NOT NULL"], ["DEFAULT NULL"]) ++ concat_field(ConfField, T);
+concat_field(ConfField, [default | T]) ->
+    case ?GET_VALUE(default, ConfField) of
         undefined ->
-            concat_fields(TableName, Field, T);
+            concat_field(ConfField, T);
         Default ->
-            [["DEFAULT '", db_tools_util:any_to_list(Default), "'"] | concat_fields(TableName, Field, T)]
+            [["DEFAULT '", db_tools_util:any_to_list(Default), "'"] | concat_field(ConfField, T)]
     end;
-concat_fields(TableName, Field, [auto_inc | T]) ->
-    ?IF(proplists:is_defined(auto_inc, Field), ["AUTO_INCREMENT"], []) ++ concat_fields(TableName, Field, T);
-concat_fields(TableName, Field, [comment | T]) ->
-    case proplists:get_value(comment, Field) of
+concat_field(ConfField, [auto_inc | T]) ->
+    ?IF(?IS_DEFINED(auto_inc, ConfField), ["AUTO_INCREMENT"], []) ++ concat_field(ConfField, T);
+concat_field(ConfField, [comment | T]) ->
+    case ?GET_VALUE(comment, ConfField) of
         undefined ->
-            concat_fields(TableName, Field, T);
+            concat_field(ConfField, T);
         Comment ->
-            [["COMMENT '", Comment, "'"] | concat_fields(TableName, Field, T)]
+            [["COMMENT '", Comment, "'"] | concat_field(ConfField, T)]
     end;
-concat_fields(_TableName, _Field, []) ->
+concat_field(_FConfField, []) ->
     [].
 
 get_index_list(TableInfo) ->
-    IndexList = proplists:get_value(index, TableInfo, []),
-    lists:flatten(lists:join(",\n", get_index_list_1(IndexList))).
+    try
+        IndexList = get_table_index_list(TableInfo),
+        IndexList1 = [["\t", Str] || Str <- get_index_list_1(IndexList)],
+        lists:flatten(lists:join(",\n", IndexList1))
+    catch
+        throw:Reason ->
+            TableNameStr = get_table_name(TableInfo),
+            throw(<<"表："/utf8, TableNameStr/binary, " ", Reason/binary>>)
+    end.
 
 get_index_list_1([Index | T]) ->
-    Result = concat_index(Index, [type, name, fields, func, comment]),
-    [["\t", lists:join(" ", Result)] | get_index_list_1(T)];
+    Result = concat_index(Index, [type, name, fields]),
+    [lists:join(" ", Result) | get_index_list_1(T)];
 get_index_list_1([]) ->
     [].
 
 concat_index(Index, [type | T]) ->
-    [?IF(proplists:is_defined(primary, Index), ["PRIMARY KEY"],
-        ?IF(proplists:is_defined(unique, Index), ["UNIQUE KEY"], ["KEY"]))
+    [?IF(?IS_DEFINED(primary, Index), ["PRIMARY KEY"],
+        ?IF(?IS_DEFINED(unique, Index), ["UNIQUE KEY"], ["KEY"]))
         | concat_index(Index, T)];
 concat_index(Index, [name | T]) ->
-    case proplists:get_value(name, Index) of
-        undefined ->
-            concat_index(Index, T);
-        Name ->
-            [["`", atom_to_list(Name), "`"] | concat_index(Index, T)]
-    end;
+    IndexName = lists:join("_", [db_tools_util:any_to_list(Field) || Field <- ?GET_VALUE(fields, Index)]),
+    [["`", IndexName, "`"] | concat_index(Index, T)];
 concat_index(Index, [fields | T]) ->
-    Fields = proplists:get_value(fields, Index),
+    Fields = ?GET_VALUE(fields, Index),
     FieldsStr = [["`", atom_to_list(Field), "`"] || Field <- Fields],
     [["(", lists:join(",", FieldsStr), ")"] | concat_index(Index, T)];
-concat_index(Index, [func | T]) ->
-    ?IF(proplists:is_defined(btree, Index), ["USING BTREE"],
-        ?IF(proplists:is_defined(hash, Index), ["USING HASH"], [])) ++ concat_index(Index, T);
-concat_index(Index, [comment | T]) ->
-    case proplists:get_value(comment, Index) of
-        undefined ->
-            concat_index(Index, T);
-        Comment ->
-            [["COMMENT '", Comment, "'"] | concat_index(Index, T)]
-    end;
 concat_index(_Index, []) ->
     [].
 
 get_options(TableInfo) ->
-    TableOptions = ?CHECK(proplists:get_value(table, TableInfo, {error, <<"配置表未指定表选项"/utf8>>})),
-    Result = concat_options(TableOptions, [engine, charset, collate, comment]),
-    lists:flatten(lists:join(" ", Result)).
+    try
+        TableOptions = get_table_options(TableInfo),
+        Result = concat_options(TableOptions, [engine, charset, collate, comment]),
+        lists:flatten(lists:join(" ", Result))
+    catch
+        throw:Reason ->
+            TableNameStr = get_table_name(TableInfo),
+            throw(<<"表："/utf8, TableNameStr/binary, " ", Reason/binary>>)
+    end.
 
 concat_options(TableOptions, [engine | T]) ->
-    case proplists:get_value(engine, TableOptions) of
-        undefined ->
-            concat_options(TableOptions, T);
-        Engine ->
-            [["ENGINE=", Engine, " DEFAULT"] | concat_options(TableOptions, T)]
-    end;
+    [["ENGINE=InnoDB DEFAULT"] | concat_options(TableOptions, T)];
 concat_options(TableOptions, [charset | T]) ->
-    case proplists:get_value(charset, TableOptions) of
+    case db_tools_dict:get_db_character() of
         undefined ->
             concat_options(TableOptions, T);
         Charset ->
             [["CHARSET=", Charset] | concat_options(TableOptions, T)]
     end;
 concat_options(TableOptions, [collate | T]) ->
-    case proplists:get_value(collate, TableOptions) of
+    case db_tools_dict:get_db_collation() of
         undefined ->
             concat_options(TableOptions, T);
         Collate ->
             [["COLLATE=", Collate] | concat_options(TableOptions, T)]
     end;
 concat_options(TableOptions, [comment | T]) ->
-    case proplists:get_value(comment, TableOptions) of
+    case ?GET_VALUE(comment, TableOptions) of
         undefined ->
             concat_options(TableOptions, T);
         Comment ->
@@ -186,46 +247,194 @@ do_alter_tables({_, Tables}) ->
     Fun = fun(TableInfo) -> do_alter_table(TableInfo) end,
     lists:foreach(Fun, Tables).
 
+%% 检查修改表结构和索引
 do_alter_table(TableInfo) ->
-    TableName = get_table_name(TableInfo),
-    get_modify_fields(TableName, TableInfo),
-    get_delete_fields(TableInfo),
-    get_add_fields(TableInfo),
-    get_modify_index(TableInfo),
-    get_delete_index(TableInfo),
-    get_add_index(TableInfo),
-    get_modify_options(TableInfo),
-    SQL = "",
-    query(SQL),
-    ok.
+    %% 检查修改表结构
+    DBFields = get_table_fields_desc(TableInfo),
+    AlterFields = get_alter_fields(TableInfo, DBFields),
+    lists:foreach(fun(SQL) -> execute(SQL) end, AlterFields),
 
-get_modify_fields(TableName, TableInfo) ->
-    Fields = ?CHECK(proplists:get_value(fields, TableInfo, {error, <<"配置表未指定表字段列"/utf8>>})),
-    SQL = io_lib:format("DESC `~ts`;", [TableName]),
+    %% 检查修改表索引
+    DBIndexList = get_table_index_desc(TableInfo),
+    AlterIndexList = get_alter_index_list(TableInfo, DBIndexList),
+    lists:foreach(fun(SQL) -> execute(SQL) end, AlterIndexList).
+
+get_table_fields_desc(TableInfo) ->
+    DBNameStr = db_tools_dict:get_db_name(),
+    TableNameStr = get_table_name(TableInfo),
+    SQL = io_lib:format("SHOW FULL FIELDS FROM `~ts`.`~ts`;", [DBNameStr, TableNameStr]),
     {ok, _Fields, ValuesList} = query(SQL),
-    lists:foldl(
-        fun([Field, Type, Null, Key, Default, Extra], AccMap) ->
-            AccMap#{
-                field => Field, type => Type,
-                null => Null, key => Key,
-                default => Default, extra => Extra
-            }
-        end, #{}, ValuesList).
+    get_table_fields_desc_1(ValuesList).
 
-get_delete_fields(TableInfo) ->
-    erlang:error(not_implemented).
+get_table_fields_desc_1([[Field, Type, Collection, Null, _Key, Default, Extra, _, Comment] | T]) ->
+    Arg1 = [{name, db_tools_util:any_to_atom(Field)}],
+    Arg2 = ?IF(Collection =/= null,
+        [{type, db_tools_util:any_to_list(<<Type/binary, " COLLATE ", Collection/binary>>)}],
+        [{type, db_tools_util:any_to_list(Type)}]),
+    Arg3 = ?IF(Null =:= <<"NO">>, [not_null], []),
+    Arg4 = ?IF(Default =/= null, [{default, db_tools_util:any_to_list(Default)}], []),
+    Arg5 = ?IF(Extra =/= <<"">>, [auto_inc], []),
+    Arg6 = ?IF(Comment =/= null, [{comment, unicode:characters_to_list(Comment)}], []),
+    [Arg1 ++ Arg2 ++ Arg3 ++ Arg4 ++ Arg5 ++ Arg6 | get_table_fields_desc_1(T)];
+get_table_fields_desc_1([]) ->
+    [].
 
-get_modify_index(TableInfo) ->
-    erlang:error(not_implemented).
+get_alter_fields(TableInfo, DBFields) ->
+    DBNameStr = db_tools_dict:get_db_name(),
+    TableNameStr = get_table_name(TableInfo),
+    ConfFields = get_table_fields(TableInfo),
+    [io_lib:format("ALTER TABLE `~ts`.`~ts` ~ts;", [DBNameStr, TableNameStr, FieldStr])
+        || FieldStr <- concat_alter_fields(first, ConfFields, DBFields)].
 
-get_add_index(TableInfo) ->
-    erlang:error(not_implemented).
+concat_alter_fields(PrevConfField, [ConfField | T], DBFields) ->
+    case compare_field(ConfField, DBFields) of
+        {[], DBFields1} ->
+            concat_alter_fields(ConfField, T, DBFields1);
+        {FieldL, DBFields1} ->
+            case PrevConfField of
+                first ->
+                    FieldStr = lists:flatten([FieldL, " FIRST "]);
+                _ ->
+                    FieldStr = lists:flatten([FieldL, " AFTER ", get_field_name(PrevConfField)])
+            end,
+            [FieldStr | concat_alter_fields(ConfField, T, DBFields1)]
+    end;
+concat_alter_fields(_ConfField, [], DBFields) ->
+    [["DROP COLUMN ", get_field_name(DBField)] || DBField <- DBFields].
 
-get_add_fields(TableInfo) ->
-    erlang:error(not_implemented).
+compare_field(ConfField, [DBField | T]) ->
+    Ret = db_tools_util:run_fun_list([
+        {fun compare_field_name/2, [ConfField, DBField]},
+        {fun compare_field_type/2, [ConfField, DBField]},
+        {fun compare_field_not_null/2, [ConfField, DBField]},
+        {fun compare_field_auto_inc/2, [ConfField, DBField]},
+        {fun compare_field_default/2, [ConfField, DBField]},
+        {fun compare_field_comment/2, [ConfField, DBField]}
+    ]),
+    case Ret of
+        true ->
+            {[], T};
+        field_name_difference ->
+            {FieldList, DBFieldList} = compare_field(ConfField, T),
+            {FieldList, [DBField | DBFieldList]};
+        _ ->
+            {["MODIFY COLUMN ", concat_fields([ConfField])], T}
+    end;
+compare_field(ConfField, []) ->
+    {["ADD COLUMN ", concat_fields([ConfField]), ?IF(?IS_DEFINED(auto_inc, ConfField), "PRIMARY KEY", [])], []}.
 
-get_delete_index(TableInfo) ->
-    erlang:error(not_implemented).
+%% 比较字段名是否相同
+compare_field_name(ConfField, DBField) ->
+    ?IF(get_field_name(ConfField) =:= get_field_name(DBField),
+        true, field_name_difference).
 
-get_modify_options(TableInfo) ->
-    erlang:error(not_implemented).
+compare_field_type(ConfField, DBField) ->
+    DBFieldTypes = string:split(get_field_type(DBField), " "),
+    case string:split(get_field_type(ConfField), " ") of
+        [ConfFieldType | []] ->
+            %% 字符类型默认会增加`COLLATE`描述
+            %% 例如：varchar(50) 实际为 varchar(50) COLLATE utf8_general_ci
+            %% 当配置表仅有类型描述无其他额外内容时，只需匹配头部类型即可
+            ?IF(ConfFieldType =:= hd(DBFieldTypes), true, field_type_difference);
+        ConfFieldTypes ->
+            ?IF(ConfFieldTypes =:= DBFieldTypes, true, field_type_difference)
+    end.
+
+compare_field_not_null(ConfField, DBField) ->
+    ?IF(?IS_DEFINED(not_null, ConfField) =:= ?IS_DEFINED(not_null, DBField),
+        true, field_not_null_difference).
+
+compare_field_auto_inc(ConfField, DBField) ->
+    ?IF(?IS_DEFINED(auto_inc, ConfField) =:= ?IS_DEFINED(auto_inc, DBField),
+        true, field_auto_inc_difference).
+
+compare_field_default(ConfField, DBField) ->
+    ?IF(db_tools_util:any_to_list(?GET_VALUE(default, ConfField)) =:= ?GET_VALUE(default, DBField, "undefined"),
+        true, field_default_difference).
+
+compare_field_comment(ConfField, DBField) ->
+    ?IF(?GET_VALUE(comment, ConfField, []) =:= ?GET_VALUE(comment, DBField, []),
+        true, field_comment_difference).
+
+get_table_index_desc(TableInfo) ->
+    DBNameStr = db_tools_dict:get_db_name(),
+    TableNameStr = get_table_name(TableInfo),
+    SQL = io_lib:format("SHOW INDEX FROM `~ts`.`~ts`;", [DBNameStr, TableNameStr]),
+    {ok, _Fields, ValuesList} = query(SQL),
+    lists:reverse(get_table_index_desc_1(ValuesList, [])).
+
+get_table_index_desc_1([H | T], Result) ->
+    [_, NonUnique, KeyName, Seq, ColumnName, _, _, _, _, _, _, _, _] = H,
+    case Seq of
+        1 ->
+            Index = [
+                {fields, [db_tools_util:any_to_atom(ColumnName)]},
+                ?IF(KeyName =:= <<"PRIMARY">>, primary, ?IF(NonUnique =:= 0, unique, normal)),
+                {name, db_tools_util:any_to_list(KeyName)}
+            ],
+            Result1 = [Index | Result];
+        _ ->
+            %% 联合索引，由于Index中有Atom数据类型，无法使用lists:keyxxx 相关操作，所以选择重新拼装一个Index结构
+            [Index | OtherIndexList] = Result,
+            Index1 = [
+                {fields, ?GET_VALUE(fields, Index) ++ [db_tools_util:any_to_atom(ColumnName)]},
+                ?IF(KeyName =:= <<"PRIMARY">>, primary, ?IF(NonUnique =:= 0, unique, normal)),
+                {name, db_tools_util:any_to_list(KeyName)}
+            ],
+            Result1 = [Index1 | OtherIndexList]
+    end,
+    get_table_index_desc_1(T, Result1);
+get_table_index_desc_1([], Result) ->
+    Result.
+
+get_alter_index_list(TableInfo, DBIndexList) ->
+    DBNameStr = db_tools_dict:get_db_name(),
+    TableNameStr = get_table_name(TableInfo),
+    ConfIndexList = get_table_index_list(TableInfo),
+    [io_lib:format("ALTER TABLE `~ts`.`~ts` ~ts;", [DBNameStr, TableNameStr, IndexStr]) ||
+        IndexStr <- concat_alter_index(ConfIndexList, DBIndexList)].
+
+concat_alter_index([ConfIndex | T], DBIndexList) ->
+    {IndexList, DBIndexList1} = compare_index(ConfIndex, DBIndexList),
+    concat_alter_index(T, DBIndexList1) ++ IndexList;
+concat_alter_index([], DBIndexList) ->
+    [
+        ["DROP INDEX `", ?GET_VALUE(name, DBIndex), "`"]
+        || DBIndex <- DBIndexList, not ?IS_DEFINED(primary, DBIndex)
+    ].
+
+compare_index(ConfIndex, [DBIndex | T]) ->
+    Ret = db_tools_util:run_fun_list([
+        {fun compare_index_fields/2, [ConfIndex, DBIndex]},
+        {fun compare_index_type/2, [ConfIndex, DBIndex]}
+    ]),
+    case Ret of
+        true ->
+            {[], T};
+        _ ->
+            {IndexList, DBIndexList} = compare_index(ConfIndex, T),
+            {IndexList, [DBIndex | DBIndexList]}
+    end;
+compare_index(ConfIndex, []) ->
+    case ?IS_DEFINED(primary, ConfIndex) of
+        true ->
+            [Fields] = concat_index(ConfIndex, [fields]),
+            {[["DROP PRIMARY KEY, ADD PRIMARY KEY ", Fields]], []};
+        false ->
+            [IndexName, Fields] = concat_index(ConfIndex, [name, fields]),
+            case ?IS_DEFINED(unique, ConfIndex) of
+                true ->
+                    {[["ADD UNIQUE ", IndexName, " ", Fields]], []};
+                false ->
+                    {[["ADD INDEX ", IndexName, " ", Fields]], []}
+            end
+    end.
+
+compare_index_fields(ConfIndex, DBIndex) ->
+    ?IF(?GET_VALUE(fields, ConfIndex) -- ?GET_VALUE(fields, DBIndex) =:= [],
+        true, index_fields_difference).
+
+compare_index_type(ConfIndex, DBIndex) ->
+    ConfIndexType = ?IF(?IS_DEFINED(primary, ConfIndex), primary, ?IF(?IS_DEFINED(unique, ConfIndex), unique, normal)),
+    DBIndexType = ?IF(?IS_DEFINED(primary, DBIndex), primary, ?IF(?IS_DEFINED(unique, DBIndex), unique, normal)),
+    ?IF(ConfIndexType =:= DBIndexType, true, index_type_difference).
