@@ -8,9 +8,8 @@
 %%%-------------------------------------------------------------------
 -define(CHECK(Expr), db_tools_util:check(Expr)).
 -define(CHECK(Expr, Reason), db_tools_util:check(Expr, Reason)).
+-define(CONSOLE(Str, Args), io:format(<<(unicode:characters_to_binary(io_lib:format(Str, Args)))/binary, "\n\n">>)).
 -define(VERBOSE(Str, Args), db_tools_dict:is_verbose() andalso ?CONSOLE(Str, Args)).
--define(CONSOLE(Str), io:format(Str ++ "~n")).
--define(CONSOLE(Str, Args), io:format(Str ++ "~n", Args)).
 -define(IF(Condition, True, False), (case Condition of true -> True; false -> False end)).
 
 -define(DEFAULT_HOST, <<"127.0.0.1">>).

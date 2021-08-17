@@ -88,15 +88,13 @@ get_db_passwd() ->
     ?CHECK(get(db_passwd), <<"请指定密码"/utf8>>).
 
 set_db_name(DBName) when is_list(DBName) ->
-    put(db_name, DBName);
-set_db_name(Config) when is_tuple(Config) ->
-    get_db_name() =:= undefined andalso put(db_name, unicode:characters_to_binary(atom_to_binary(element(1, Config)))).
+    put(db_name, DBName).
 
 get_db_name() ->
-    get(db_name).
+    ?CHECK(get(db_name), <<"请指定数据库名"/utf8>>).
 
 set_export_filename(Filename) ->
-    {ok, IO} = file:open(Filename, [write]),
+    {ok, IO} = file:open(Filename, [write, {encoding, utf8}]),
     put(export_filename, IO).
 
 get_export_filename() ->

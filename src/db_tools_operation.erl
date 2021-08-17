@@ -13,46 +13,55 @@
 %% API
 -export([do_connect_db/0, do_create_db/0, do_create_tables/1, do_alter_tables/1]).
 
+%% 执行一条SQL查询
 query(SQL) ->
     query(SQL, []).
 query(SQL, Params) ->
-    ?VERBOSE("SQL:~ts~n Parmas:~w", [SQL, Params]),
     Conn = db_tools_dict:get_db_conn(),
     BinSQL = unicode:characters_to_binary(SQL),
-    Result = ?CHECK(mysql:query(Conn, BinSQL, Params)),
-    Result.
+    ?VERBOSE("SQL:~ts", [BinSQL]),
+    ?CHECK(mysql:query(Conn, BinSQL, Params)).
 
+%% 执行一条SQL语句
 execute(SQL) ->
     execute(SQL, []).
 execute(SQL, Params) ->
-    ?VERBOSE("SQL:~ts~n Parmas:~w", [SQL, Params]),
     Conn = db_tools_dict:get_db_conn(),
     BinSQL = unicode:characters_to_binary(SQL),
+    ?VERBOSE("SQL:~ts", [BinSQL]),
     Result = ?CHECK(mysql:query(Conn, BinSQL, Params)),
     db_tools:do_export_db(BinSQL),
     Result.
 
+%% 获取表选项
 get_table_options(TableInfo) ->
     ?CHECK(?GET_VALUE(table, TableInfo, {error, <<"未指定表选项，请检查"/utf8>>})).
 
+%% 获取表名
 get_table_name(TableInfo) ->
     TableOptions = get_table_options(TableInfo),
     AtomTableName = ?CHECK(?GET_VALUE(name, TableOptions, {error, <<"未指定表名，请检查"/utf8>>})),
     unicode:characters_to_binary(atom_to_binary(AtomTableName)).
 
+%% 获取表字段列表
 get_table_fields(TableInfo) ->
     ?CHECK(?GET_VALUE(fields, TableInfo, {error, <<"未指定表字段列，请检查"/utf8>>})).
 
+%% 获取字段名
 get_field_name(Field) ->
     AtomFieldName = ?CHECK(?GET_VALUE(name, Field, {error, <<"未指定字段name选项，请检查"/utf8>>})),
     unicode:characters_to_binary(atom_to_binary(AtomFieldName)).
 
+%% 获取字段类型
 get_field_type(Field) ->
     ?CHECK(?GET_VALUE(type, Field, {error, <<"未指定type选项，请检查"/utf8>>})).
 
+%% 获取表索引列表
 get_table_index_list(TableInfo) ->
     ?GET_VALUE(index, TableInfo, []).
 
+%% 执行连接数据库
+-spec do_connect_db() -> ok|no_return().
 do_connect_db() ->
     Args = [
         {host, db_tools_dict:get_db_host()},
@@ -68,6 +77,8 @@ do_connect_db() ->
     end,
     ok.
 
+%% 执行创建数据库
+-spec do_create_db() -> ok|no_return().
 do_create_db() ->
     DBNameStr = db_tools_dict:get_db_name(),
     SQL = io_lib:format("SELECT `SCHEMA_NAME` FROM `information_schema`.`SCHEMATA` WHERE `SCHEMA_NAME`='~ts';", [DBNameStr]),
@@ -76,31 +87,35 @@ do_create_db() ->
             ok;
         {ok, _Fields, _Values} ->
             CreateDBSQL = io_lib:format("CREATE DATABASE `~ts` ~ts;", [DBNameStr, get_db_options()]),
-            execute(CreateDBSQL)
+            execute(CreateDBSQL),
+            ok
     end.
 
+%% 拼接数据库表选项
 get_db_options() ->
-    OptionsList = get_db_option([character, collation]),
+    OptionsList = concat_db_option([character, collation]),
     lists:flatten(lists:join(" ", OptionsList)).
 
-get_db_option([character | T]) ->
+concat_db_option([character | T]) ->
     case db_tools_dict:get_db_character() of
         undefined ->
-            get_db_option(T);
+            concat_db_option(T);
         Character ->
-            [["DEFAULT CHARACTER SET ", Character] | get_db_option(T)]
+            [["DEFAULT CHARACTER SET ", Character] | concat_db_option(T)]
     end;
-get_db_option([collation | T]) ->
+concat_db_option([collation | T]) ->
     case db_tools_dict:get_db_collation() of
         undefined ->
-            get_db_option(T);
+            concat_db_option(T);
         Collation ->
-            [["DEFAULT COLLATE ", Collation] | get_db_option(T)]
+            [["DEFAULT COLLATE ", Collation] | concat_db_option(T)]
     end;
-get_db_option([]) ->
+concat_db_option([]) ->
     [].
 
-do_create_tables({_, Tables}) ->
+%% 执行创建数据库表结构
+-spec do_create_tables(Tables :: list()) -> ok|no_return().
+do_create_tables(Tables) ->
     Fun = fun(TableInfo) -> do_create_table(TableInfo) end,
     lists:foreach(Fun, Tables).
 
@@ -112,8 +127,8 @@ do_create_table(TableInfo) ->
             FieldsStr = get_fields(TableInfo),
             IndexLStr = get_index_list(TableInfo),
             Options = get_options(TableInfo),
-            {SQL, Args} = {"CREATE TABLE `~ts`.`~ts` (~n~ts", [DBNameStr, TableNameStr, FieldsStr]},
-            {SQL1, Args1} = ?IF(IndexLStr =:= [], {SQL ++ "~n) ", Args}, {SQL ++ ",~n~ts\n) ", Args ++ [IndexLStr]}),
+            {SQL, Args} = {"CREATE TABLE `~ts`.`~ts` (\n~ts", [DBNameStr, TableNameStr, FieldsStr]},
+            {SQL1, Args1} = ?IF(IndexLStr =:= [], {SQL ++ "\n) ", Args}, {SQL ++ ",\n~ts\n) ", Args ++ [IndexLStr]}),
             {SQL2, Args2} = ?IF(Options =:= [], {SQL1 ++ ";", Args1}, {SQL1 ++ "~ts;", Args1 ++ [Options]}),
             SQL4 = io_lib:format(SQL2, Args2),
             execute(SQL4);
@@ -132,6 +147,7 @@ is_not_table_exist(TableNameStr) ->
             true
     end.
 
+%% 拼接表字段
 get_fields(TableInfo) ->
     try
         Fields = get_table_fields(TableInfo),
@@ -175,6 +191,7 @@ concat_field(ConfField, [comment | T]) ->
 concat_field(_FConfField, []) ->
     [].
 
+%% 拼接表索引
 get_index_list(TableInfo) ->
     try
         IndexList = get_table_index_list(TableInfo),
@@ -206,6 +223,7 @@ concat_index(Index, [fields | T]) ->
 concat_index(_Index, []) ->
     [].
 
+%% 拼接表选项
 get_options(TableInfo) ->
     try
         TableOptions = get_table_options(TableInfo),
@@ -243,7 +261,9 @@ concat_options(TableOptions, [comment | T]) ->
 concat_options(_TableOptions, []) ->
     [].
 
-do_alter_tables({_, Tables}) ->
+%% 执行修改表结构
+-spec do_alter_tables(Tables :: list()) -> ok|no_return().
+do_alter_tables(Tables) ->
     Fun = fun(TableInfo) -> do_alter_table(TableInfo) end,
     lists:foreach(Fun, Tables).
 
@@ -323,7 +343,6 @@ compare_field(ConfField, [DBField | T]) ->
 compare_field(ConfField, []) ->
     {["ADD COLUMN ", concat_fields([ConfField]), ?IF(?IS_DEFINED(auto_inc, ConfField), "PRIMARY KEY", [])], []}.
 
-%% 比较字段名是否相同
 compare_field_name(ConfField, DBField) ->
     ?IF(get_field_name(ConfField) =:= get_field_name(DBField),
         true, field_name_difference).

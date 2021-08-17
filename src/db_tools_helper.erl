@@ -13,6 +13,8 @@
 %% API
 -export([parse_args/1, help/0]).
 
+%% 解析输出参数
+-spec parse_args(list()) -> ok|help.
 parse_args(["--help" | _T]) ->
     help;
 parse_args(["--verbose" | T]) ->
@@ -48,6 +50,8 @@ parse_args(["-e", ExportFilename | T]) ->
 parse_args([]) ->
     ok.
 
+%% 打印使用帮助
+-spec help() -> ok.
 help() ->
     Help = [
         "数据库表结构管理工具",
@@ -61,7 +65,8 @@ help() ->
         "-P             指定MySQL端口号（默认：~w）",
         "-u             指定MySQL用户名",
         "-p             指定MySQL密码",
-        "-n             指定数据库名（默认：通过指定的配置表获取）",
+        "-n             指定数据库名",
         "-e             指定导出SQL语句的文件名（默认：不导出）"
     ],
-    ?CONSOLE(lists:flatten(lists:join("\n", Help)), [?DEFAULT_HOST, ?DEFAULT_PORT]).
+    Str = io_lib:format(lists:flatten(lists:join("\n", Help)), [?DEFAULT_HOST, ?DEFAULT_PORT]),
+    ?CONSOLE("~ts", [Str]).

@@ -2,7 +2,7 @@
 %%% @author gz1417
 %%% @copyright (C) 2021, <COMPANY>
 %%% @doc
-%%%
+%%% 工具集合
 %%% @end
 %%% Created : 05. 8月 2021 11:11
 %%%-------------------------------------------------------------------
@@ -11,8 +11,9 @@
 -include("db_tools.hrl").
 
 %% API
--export([check/1, check/2, any_to_list/1, any_to_atom/1, key_take/2, key_find/2, key_del/2, run_fun_list/1]).
+-export([check/1, check/2, any_to_list/1, any_to_atom/1, run_fun_list/1]).
 
+-spec check(Expr :: term()) -> no_return()|term().
 check(Expr) ->
     case Expr of
         {error, Reason} ->
@@ -21,6 +22,7 @@ check(Expr) ->
             Value
     end.
 
+-spec check(Expr :: term(), Reason :: term()) -> no_return()|term().
 check(Expr, Reason) ->
     case Expr of
         undefined ->
@@ -29,6 +31,7 @@ check(Expr, Reason) ->
             Value
     end.
 
+-spec any_to_list(Any :: list()|binary()|atom()|integer()|float()) -> list().
 any_to_list(Any) when is_list(Any) ->
     Any;
 any_to_list(Any) when is_binary(Any) ->
@@ -40,28 +43,17 @@ any_to_list(Any) when is_integer(Any) ->
 any_to_list(Any) when is_float(Any) ->
     float_to_list(Any).
 
+-spec any_to_atom(Any :: list()|binary()|atom()|integer()|float()) -> atom().
+any_to_atom(Any) when is_list(Any) ->
+    list_to_atom(Any);
 any_to_atom(Any) when is_binary(Any) ->
     binary_to_atom(Any);
-any_to_atom(Any) when is_list(Any) ->
-    list_to_atom(Any).
+any_to_atom(Any) when is_atom(Any) ->
+    Any;
+any_to_atom(Any) ->
+    list_to_atom(any_to_list(Any)).
 
-
-key_take(Key, [H | T]) ->
-    ?IF(lists:member(Key, H), {H, T}, key_take(Key, T));
-key_take(_Key, []) ->
-    false.
-
-key_find(Key, [H | T]) ->
-    ?IF(lists:member(Key, H), H, key_find(Key, T));
-key_find(_Key, []) ->
-    false.
-
-key_del(Key, [H | T]) ->
-    ?IF(lists:member(Key, H), T, [H | key_del(Key, T)]);
-key_del(_Key, []) ->
-    [].
-
-
+-spec run_fun_list([{function(), [term()]}]) -> true|term().
 run_fun_list([{Fun, Args} | T]) ->
     case erlang:apply(Fun, Args) of
         true ->
