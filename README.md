@@ -27,7 +27,7 @@ TODO
     表选项：{table, [name(), comment()]}
     表字段：{fields, [[name(), field_type(), not_null(), auto_inc(), field_default(), comment()], ...]}
     索引列：{index, [[index_fields(), index_type()], ...]}
-    扩展列：{extend_fields, [[name(), extend_type(), extend_default(), comment()], ...]}
+    扩展列：{extend_fields, [[name(), extend_default(), comment()], ...]}
     
     -type name() :: {name, atom()}.
     指定表、字段、索引以及扩展字段的名称，其中索引名称可以省略，默认取第一个字段名作为其索引名称
@@ -52,9 +52,6 @@ TODO
     
     -type comment() :: {comment, string()}.
     指定表、字段以及扩展字段的注释，省略则为空
-    
-    -type extend_type() :: {type, atom()}.
-    指定扩展字段类型，可使用所有Erlang中允许的数据类型，省略则为undefined
     
     -type extend_default() :: {default, any()}.
     指定扩展字段默认值，可使用所有Erlang中允许的数据类型，省略则为undefined

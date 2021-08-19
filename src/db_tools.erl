@@ -5,9 +5,6 @@
 %% API exports
 -export([main/1]).
 
-%% Internal API
--export([do_export_db/1]).
-
 %%====================================================================
 %% API functions
 %%====================================================================
@@ -29,41 +26,43 @@ do_main([]) ->
 do_main(Args) ->
     case db_tools_helper:parse_args(Args) of
         ok ->
-            try
-                Config = get_filename(),
-                db_tools_operation:do_connect_db(),
-                db_tools_operation:do_create_db(),
-                db_tools_operation:do_create_tables(Config),
-                db_tools_operation:do_alter_tables(Config)
-            catch
-                throw:Reason ->
-                    ?CONSOLE("执行失败:~tp", [Reason]);
-                Err:Reason:Track ->
-                    ?CONSOLE("Err:~w Reason:~w\nTrack:~tp", [Err, Reason, Track])
-            end;
+            do(db_tools_dict:get_mode());
         help ->
             db_tools_helper:help()
-    end,
-    do_close_export().
+    end.
+
+do(?MODE_UPDATE_DB) ->
+    try
+        Config = get_filename(),
+        db_tools_db_operation:do_connect_db(),
+        db_tools_db_operation:do_create_db(),
+        db_tools_db_operation:do_create_tables(Config),
+        db_tools_db_operation:do_alter_tables(Config)
+    catch
+        throw:Reason ->
+            ?CONSOLE("更新创建MySQL数据库表结构失败，原因：~ts", [Reason]);
+        Err:Reason:Track ->
+            ?CONSOLE("Err:~w Reason:~w\nTrack:~tp", [Err, Reason, Track])
+    after
+        db_tools_db_operation:do_close_io()
+    end;
+
+do(?MODE_TRUNCATE_DB) ->
+    ok;
+
+do(?MODE_GEN_ENTITY) ->
+    try
+        Config = get_filename(),
+        db_tools_gen_entity:do_gen_entity(Config)
+    catch
+        throw:Reason ->
+            ?CONSOLE("生成Erlang实体文件失败，原因：~ts", [Reason]);
+        Err:Reason:Track ->
+            ?CONSOLE("Err:~w Reason:~w\nTrack:~tp", [Err, Reason, Track])
+    end .
 
 get_filename() ->
     Filename = db_tools_dict:get_config_filename(),
     {ok, [Config]} = file:consult(Filename),
     Config.
 
--spec do_export_db(SQL :: string()) -> ok|{error, Reason :: file:posix() | badarg | terminated}.
-do_export_db(SQL) ->
-    case db_tools_dict:get_export_filename() of
-        undefined ->
-            ok;
-        IO when is_pid(IO) ->
-            io:format(IO, "~ts\n\n", [SQL])
-    end.
-
-do_close_export() ->
-    case db_tools_dict:get_export_filename() of
-        undefined ->
-            ok;
-        IO when is_pid(IO) ->
-            file:close(IO)
-    end.

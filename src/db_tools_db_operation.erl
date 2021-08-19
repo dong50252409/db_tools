@@ -6,12 +6,31 @@
 %%% @end
 %%% Created : 06. 8月 2021 16:23
 %%%-------------------------------------------------------------------
--module(db_tools_operation).
+-module(db_tools_db_operation).
 
 -include("db_tools.hrl").
 
 %% API
--export([do_connect_db/0, do_create_db/0, do_create_tables/1, do_alter_tables/1]).
+-export([do_close_io/0, do_connect_db/0, do_create_db/0, do_create_tables/1, do_alter_tables/1]).
+
+-spec do_close_io() -> ok.
+do_close_io() ->
+    case db_tools_dict:get_export_io() of
+        undefined ->
+            ok;
+        IO when is_pid(IO) ->
+            file:close(IO)
+    end,
+    ok.
+
+%% 执行导出SQL语句到文件
+do_export_sql(SQL) ->
+    case db_tools_dict:get_export_io() of
+        undefined ->
+            ok;
+        IO when is_pid(IO) ->
+            io:format(IO, "~ts\n\n", [SQL])
+    end.
 
 %% 执行一条SQL查询
 query(SQL) ->
@@ -30,35 +49,8 @@ execute(SQL, Params) ->
     BinSQL = unicode:characters_to_binary(SQL),
     ?VERBOSE("SQL:~ts", [BinSQL]),
     Result = ?CHECK(mysql:query(Conn, BinSQL, Params)),
-    db_tools:do_export_db(BinSQL),
+    do_export_sql(BinSQL),
     Result.
-
-%% 获取表选项
-get_table_options(TableInfo) ->
-    ?CHECK(?GET_VALUE(table, TableInfo, {error, <<"未指定表选项，请检查"/utf8>>})).
-
-%% 获取表名
-get_table_name(TableInfo) ->
-    TableOptions = get_table_options(TableInfo),
-    AtomTableName = ?CHECK(?GET_VALUE(name, TableOptions, {error, <<"未指定表名，请检查"/utf8>>})),
-    unicode:characters_to_binary(atom_to_binary(AtomTableName)).
-
-%% 获取表字段列表
-get_table_fields(TableInfo) ->
-    ?CHECK(?GET_VALUE(fields, TableInfo, {error, <<"未指定表字段列，请检查"/utf8>>})).
-
-%% 获取字段名
-get_field_name(Field) ->
-    AtomFieldName = ?CHECK(?GET_VALUE(name, Field, {error, <<"未指定字段name选项，请检查"/utf8>>})),
-    unicode:characters_to_binary(atom_to_binary(AtomFieldName)).
-
-%% 获取字段类型
-get_field_type(Field) ->
-    ?CHECK(?GET_VALUE(type, Field, {error, <<"未指定type选项，请检查"/utf8>>})).
-
-%% 获取表索引列表
-get_table_index_list(TableInfo) ->
-    ?GET_VALUE(index, TableInfo, []).
 
 %% 执行连接数据库
 -spec do_connect_db() -> ok|no_return().
@@ -114,13 +106,13 @@ concat_db_option([]) ->
     [].
 
 %% 执行创建数据库表结构
--spec do_create_tables(Tables :: list()) -> ok|no_return().
-do_create_tables(Tables) ->
+-spec do_create_tables(Config :: list()) -> ok|no_return().
+do_create_tables(Config) ->
     Fun = fun(TableInfo) -> do_create_table(TableInfo) end,
-    lists:foreach(Fun, Tables).
+    lists:foreach(Fun, Config).
 
 do_create_table(TableInfo) ->
-    TableNameStr = get_table_name(TableInfo),
+    TableNameStr = db_tools_table:get_table_name(TableInfo),
     case is_not_table_exist(TableNameStr) of
         true ->
             DBNameStr = db_tools_dict:get_db_name(),
@@ -150,11 +142,11 @@ is_not_table_exist(TableNameStr) ->
 %% 拼接表字段
 get_fields(TableInfo) ->
     try
-        Fields = get_table_fields(TableInfo),
+        Fields = db_tools_table:get_table_fields(TableInfo),
         lists:flatten(lists:join(",\n", [["\t", Str] || Str <- concat_fields(Fields)]))
     catch
         throw:Reason ->
-            TableNameStr = get_table_name(TableInfo),
+            TableNameStr = db_tools_table:get_table_name(TableInfo),
             throw(<<"表："/utf8, TableNameStr/binary, " ", Reason/binary>>)
     end.
 
@@ -165,10 +157,10 @@ concat_fields([]) ->
     [].
 
 concat_field(ConfField, [name | T]) ->
-    NameStr = get_field_name(ConfField),
+    NameStr = db_tools_table:get_field_name(ConfField),
     [["`", NameStr, "`"] | concat_field(ConfField, T)];
 concat_field(ConfField, [type | T]) ->
-    Type = get_field_type(ConfField),
+    Type = db_tools_table:get_field_type(ConfField),
     [[Type] | concat_field(ConfField, T)];
 concat_field(ConfField, [not_null | T]) ->
     ?IF(?IS_DEFINED(not_null, ConfField), ["NOT NULL"], ["DEFAULT NULL"]) ++ concat_field(ConfField, T);
@@ -194,12 +186,12 @@ concat_field(_FConfField, []) ->
 %% 拼接表索引
 get_index_list(TableInfo) ->
     try
-        IndexList = get_table_index_list(TableInfo),
+        IndexList = db_tools_table:get_table_index_list(TableInfo),
         IndexList1 = [["\t", Str] || Str <- get_index_list_1(IndexList)],
         lists:flatten(lists:join(",\n", IndexList1))
     catch
         throw:Reason ->
-            TableNameStr = get_table_name(TableInfo),
+            TableNameStr = db_tools_table:get_table_name(TableInfo),
             throw(<<"表："/utf8, TableNameStr/binary, " ", Reason/binary>>)
     end.
 
@@ -217,7 +209,7 @@ concat_index(Index, [name | T]) ->
     IndexName = lists:join("_", [db_tools_util:any_to_list(Field) || Field <- ?GET_VALUE(fields, Index)]),
     [["`", IndexName, "`"] | concat_index(Index, T)];
 concat_index(Index, [fields | T]) ->
-    Fields = ?GET_VALUE(fields, Index),
+    Fields = db_tools_table:get_index_fields(Index),
     FieldsStr = [["`", atom_to_list(Field), "`"] || Field <- Fields],
     [["(", lists:join(",", FieldsStr), ")"] | concat_index(Index, T)];
 concat_index(_Index, []) ->
@@ -226,12 +218,12 @@ concat_index(_Index, []) ->
 %% 拼接表选项
 get_options(TableInfo) ->
     try
-        TableOptions = get_table_options(TableInfo),
+        TableOptions = db_tools_table:get_table_options(TableInfo),
         Result = concat_options(TableOptions, [engine, charset, collate, comment]),
         lists:flatten(lists:join(" ", Result))
     catch
         throw:Reason ->
-            TableNameStr = get_table_name(TableInfo),
+            TableNameStr = db_tools_table:get_table_name(TableInfo),
             throw(<<"表："/utf8, TableNameStr/binary, " ", Reason/binary>>)
     end.
 
@@ -252,7 +244,7 @@ concat_options(TableOptions, [collate | T]) ->
             [["COLLATE=", Collate] | concat_options(TableOptions, T)]
     end;
 concat_options(TableOptions, [comment | T]) ->
-    case ?GET_VALUE(comment, TableOptions) of
+    case db_tools_table:get_table_comment(TableOptions) of
         undefined ->
             concat_options(TableOptions, T);
         Comment ->
@@ -262,10 +254,10 @@ concat_options(_TableOptions, []) ->
     [].
 
 %% 执行修改表结构
--spec do_alter_tables(Tables :: list()) -> ok|no_return().
-do_alter_tables(Tables) ->
+-spec do_alter_tables(Config :: list()) -> ok|no_return().
+do_alter_tables(Config) ->
     Fun = fun(TableInfo) -> do_alter_table(TableInfo) end,
-    lists:foreach(Fun, Tables).
+    lists:foreach(Fun, Config).
 
 %% 检查修改表结构和索引
 do_alter_table(TableInfo) ->
@@ -281,7 +273,7 @@ do_alter_table(TableInfo) ->
 
 get_table_fields_desc(TableInfo) ->
     DBNameStr = db_tools_dict:get_db_name(),
-    TableNameStr = get_table_name(TableInfo),
+    TableNameStr = db_tools_table:get_table_name(TableInfo),
     SQL = io_lib:format("SHOW FULL FIELDS FROM `~ts`.`~ts`;", [DBNameStr, TableNameStr]),
     {ok, _Fields, ValuesList} = query(SQL),
     get_table_fields_desc_1(ValuesList).
@@ -301,8 +293,8 @@ get_table_fields_desc_1([]) ->
 
 get_alter_fields(TableInfo, DBFields) ->
     DBNameStr = db_tools_dict:get_db_name(),
-    TableNameStr = get_table_name(TableInfo),
-    ConfFields = get_table_fields(TableInfo),
+    TableNameStr = db_tools_table:get_table_name(TableInfo),
+    ConfFields = db_tools_table:get_table_fields(TableInfo),
     [io_lib:format("ALTER TABLE `~ts`.`~ts` ~ts;", [DBNameStr, TableNameStr, FieldStr])
         || FieldStr <- concat_alter_fields(first, ConfFields, DBFields)].
 
@@ -315,12 +307,12 @@ concat_alter_fields(PrevConfField, [ConfField | T], DBFields) ->
                 first ->
                     FieldStr = lists:flatten([FieldL, " FIRST "]);
                 _ ->
-                    FieldStr = lists:flatten([FieldL, " AFTER ", get_field_name(PrevConfField)])
+                    FieldStr = lists:flatten([FieldL, " AFTER ", db_tools_table:get_field_name(PrevConfField)])
             end,
             [FieldStr | concat_alter_fields(ConfField, T, DBFields1)]
     end;
 concat_alter_fields(_ConfField, [], DBFields) ->
-    [["DROP COLUMN ", get_field_name(DBField)] || DBField <- DBFields].
+    [["DROP COLUMN ", db_tools_table:get_field_name(DBField)] || DBField <- DBFields].
 
 compare_field(ConfField, [DBField | T]) ->
     Ret = db_tools_util:run_fun_list([
@@ -344,12 +336,12 @@ compare_field(ConfField, []) ->
     {["ADD COLUMN ", concat_fields([ConfField]), ?IF(?IS_DEFINED(auto_inc, ConfField), "PRIMARY KEY", [])], []}.
 
 compare_field_name(ConfField, DBField) ->
-    ?IF(get_field_name(ConfField) =:= get_field_name(DBField),
+    ?IF(db_tools_table:get_field_name(ConfField) =:= db_tools_table:get_field_name(DBField),
         true, field_name_difference).
 
 compare_field_type(ConfField, DBField) ->
-    DBFieldTypes = string:split(get_field_type(DBField), " "),
-    case string:split(get_field_type(ConfField), " ") of
+    DBFieldTypes = string:split(db_tools_table:get_field_type(DBField), " "),
+    case string:split(db_tools_table:get_field_type(ConfField), " ") of
         [ConfFieldType | []] ->
             %% 字符类型默认会增加`COLLATE`描述
             %% 例如：varchar(50) 实际为 varchar(50) COLLATE utf8_general_ci
@@ -377,7 +369,7 @@ compare_field_comment(ConfField, DBField) ->
 
 get_table_index_desc(TableInfo) ->
     DBNameStr = db_tools_dict:get_db_name(),
-    TableNameStr = get_table_name(TableInfo),
+    TableNameStr = db_tools_table:get_table_name(TableInfo),
     SQL = io_lib:format("SHOW INDEX FROM `~ts`.`~ts`;", [DBNameStr, TableNameStr]),
     {ok, _Fields, ValuesList} = query(SQL),
     lists:reverse(get_table_index_desc_1(ValuesList, [])).
@@ -408,8 +400,8 @@ get_table_index_desc_1([], Result) ->
 
 get_alter_index_list(TableInfo, DBIndexList) ->
     DBNameStr = db_tools_dict:get_db_name(),
-    TableNameStr = get_table_name(TableInfo),
-    ConfIndexList = get_table_index_list(TableInfo),
+    TableNameStr = db_tools_table:get_table_name(TableInfo),
+    ConfIndexList = db_tools_table:get_table_index_list(TableInfo),
     [io_lib:format("ALTER TABLE `~ts`.`~ts` ~ts;", [DBNameStr, TableNameStr, IndexStr]) ||
         IndexStr <- concat_alter_index(ConfIndexList, DBIndexList)].
 

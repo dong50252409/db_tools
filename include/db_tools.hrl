@@ -19,6 +19,11 @@
 -define(GET_VALUE(Key, List, Default), proplists:get_value(Key, List, Default)).
 -define(IS_DEFINED(Key, List), proplists:is_defined(Key, List)).
 
+%% 工具运行模式
+-define(MODE_UPDATE_DB, 1).     % 更新数据库以及表结构
+-define(MODE_TRUNCATE_DB, 2).   % 截断数据库表（清库）
+-define(MODE_GEN_ENTITY, 3).    % 生成Erlang数据库表实体文件
+
 %% 用于记录修改历史
 -define(DB_TOOLS_LOG_NAME, <<"db_tools_log">>).
 -define(DB_TOOLS_LOG, """

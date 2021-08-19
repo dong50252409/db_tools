@@ -1,5 +1,5 @@
 {application, db_tools,
- [{description, "An escript"},
+ [{description, "数据库表结构管理工具"},
   {vsn, "0.1.0"},
   {registered, []},
   {applications,
