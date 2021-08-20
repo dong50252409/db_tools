@@ -50,7 +50,7 @@ MySQL数据库表结构自动更新管理工具
     -type extend_default() :: {default, any()}.
     指定扩展字段默认值，可使用所有Erlang中允许的数据类型，省略则为undefined
 
-建议的模板
+简单的模板
 ----
     [
         [
