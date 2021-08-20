@@ -50,6 +50,12 @@ parse_args([Param, DBName | T]) when Param =:= "-n"; Param =:= "--db_name" ->
 parse_args([Param, ExportFilename | T]) when Param =:= "-e"; Param =:= "--export" ->
     db_tools_dict:set_export_filename(ExportFilename),
     parse_args(T);
+parse_args(["--not_del_tbl" | T]) ->
+    db_tools_dict:set_not_del_tbl(),
+    parse_args(T);
+parse_args(["--not_del_field" | T]) ->
+    db_tools_dict:set_not_del_field(),
+    parse_args(T);
 parse_args(["--out_hrl", OutHrl | T]) ->
     db_tools_dict:set_out_hrl(OutHrl),
     parse_args(T);
@@ -75,10 +81,10 @@ help() ->
         "   --verbose                   显示详细内容",
         "可用的选项（需要指定额外参数，使用空格分隔每个参数）",
         "   -f          --filename      指定配置表文件位置",
-        "   -m          --mode          执行模式，可选模式如下",
+        "   -m          --mode          指定执行模式，可选模式如下",
         "                               update_db 创建更新数据库以及表结构",
         "                               truncate_db 仅执行截断数据库表（清库）",
-        "                               gen_entity 生成数据库表对应Erlang的实体文件",
+        "                               gen_model 生成数据库表对应Erlang的实体文件",
         "",
         "数据库管理相关可用选项",
         "   --character                 指定数据库以及表字符集，不指定则为默认设置",
@@ -89,12 +95,14 @@ help() ->
         "   -p          --passwd        指定MySQL密码",
         "   -n          --db_name       指定数据库名",
         "   -e          --export        指定导出SQL语句的文件名（默认：不导出）",
+        "   --not_del_tbl               指定更新时不删除配置表文件中不存在的数据库表，无额外参数（默认：删除配置表中不存在的数据库表）",
+        "   --not_del_field             指定更新时不删除配置表文件中不存在的表字段，无额外参数（默认：删除配置表中不存在的字段）",
         "",
         "Erlang文件生成相关可用选项",
-        "   --out_hrl                   HRL文件输出位置（默认：当前目录）",
-        "   --hrl_prifix                统一增加HRL文件前缀",
-        "   --out_erl                   ERL文件输出位置（默认：当前目录）",
-        "   --erl_prifix                统一增加ERL文件浅醉"
+        "   --out_hrl                   指定HRL文件输出位置（默认：当前目录）",
+        "   --hrl_prifix                指定统一增加HRL文件前缀",
+        "   --out_erl                   指定ERL文件输出位置（默认：当前目录）",
+        "   --erl_prifix                指定统一增加ERL文件浅醉"
     ],
     Str = io_lib:format(lists:flatten(lists:join("\n", Help)), [?DEFAULT_HOST, ?DEFAULT_PORT]),
     ?CONSOLE("~ts", [Str]).

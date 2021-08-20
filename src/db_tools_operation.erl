@@ -6,12 +6,26 @@
 %%% @end
 %%% Created : 06. 8月 2021 16:23
 %%%-------------------------------------------------------------------
--module(db_tools_db_operation).
+-module(db_tools_operation).
 
 -include("db_tools.hrl").
 
 %% API
--export([do_close_io/0, do_connect_db/0, do_create_db/0, do_create_tables/1, do_alter_tables/1]).
+-export([do_update_db/1, do_truncate_tables/1]).
+
+%% 执行更新数据库操作
+-spec do_update_db(Config :: list()) -> ok.
+do_update_db(Config) ->
+    do_connect_db(),
+    do_create_db(),
+    Fun =
+        fun(TableInfo) ->
+            do_create_table(TableInfo),
+            do_alter_table(TableInfo)
+        end,
+    lists:foreach(Fun, Config),
+    do_drop_tables(Config),
+    do_close_io().
 
 -spec do_close_io() -> ok.
 do_close_io() ->
@@ -106,11 +120,7 @@ concat_db_option([]) ->
     [].
 
 %% 执行创建数据库表结构
--spec do_create_tables(Config :: list()) -> ok|no_return().
-do_create_tables(Config) ->
-    Fun = fun(TableInfo) -> do_create_table(TableInfo) end,
-    lists:foreach(Fun, Config).
-
+-spec do_create_table(Config :: list()) -> ok|no_return().
 do_create_table(TableInfo) ->
     TableNameStr = db_tools_table:get_table_name(TableInfo),
     case is_not_table_exist(TableNameStr) of
@@ -244,7 +254,7 @@ concat_options(TableOptions, [collate | T]) ->
             [["COLLATE=", Collate] | concat_options(TableOptions, T)]
     end;
 concat_options(TableOptions, [comment | T]) ->
-    case db_tools_table:get_table_comment(TableOptions) of
+    case ?GET_VALUE(comment, TableOptions) of
         undefined ->
             concat_options(TableOptions, T);
         Comment ->
@@ -254,12 +264,6 @@ concat_options(_TableOptions, []) ->
     [].
 
 %% 执行修改表结构
--spec do_alter_tables(Config :: list()) -> ok|no_return().
-do_alter_tables(Config) ->
-    Fun = fun(TableInfo) -> do_alter_table(TableInfo) end,
-    lists:foreach(Fun, Config).
-
-%% 检查修改表结构和索引
 do_alter_table(TableInfo) ->
     %% 检查修改表结构
     DBFields = get_table_fields_desc(TableInfo),
@@ -312,7 +316,12 @@ concat_alter_fields(PrevConfField, [ConfField | T], DBFields) ->
             [FieldStr | concat_alter_fields(ConfField, T, DBFields1)]
     end;
 concat_alter_fields(_ConfField, [], DBFields) ->
-    [["DROP COLUMN ", db_tools_table:get_field_name(DBField)] || DBField <- DBFields].
+    case db_tools_dict:is_not_del_field() of
+        true ->
+            [];
+        false ->
+            [["DROP COLUMN ", db_tools_table:get_field_name(DBField)] || DBField <- DBFields]
+    end.
 
 compare_field(ConfField, [DBField | T]) ->
     Ret = db_tools_util:run_fun_list([
@@ -449,3 +458,35 @@ compare_index_type(ConfIndex, DBIndex) ->
     ConfIndexType = ?IF(?IS_DEFINED(primary, ConfIndex), primary, ?IF(?IS_DEFINED(unique, ConfIndex), unique, normal)),
     DBIndexType = ?IF(?IS_DEFINED(primary, DBIndex), primary, ?IF(?IS_DEFINED(unique, DBIndex), unique, normal)),
     ?IF(ConfIndexType =:= DBIndexType, true, index_type_difference).
+
+%% 执行删除多余数据库表
+-spec do_drop_tables(Config :: list()) -> ok.
+do_drop_tables(Config) ->
+    case db_tools_dict:is_not_del_tbl() of
+        true ->
+            ok;
+        false ->
+            QuerySQL = io_lib:format("SELECT `TABLE_NAME` FROM `information_schema`.TABLES WHERE TABLE_SCHEMA='~ts'",
+                [db_tools_dict:get_db_name()]),
+            {ok, _Fields, ValuesList} = query(QuerySQL),
+            DropTableNameList = lists:flatten(ValuesList) -- [db_tools_table:get_table_name(TableInfo) || TableInfo <- Config],
+            Fun =
+                fun(DropTableName) ->
+                    DropSQL = io_lib:format("DROP TABLE `~ts`.`~ts`;", [db_tools_dict:get_db_name(), DropTableName]),
+                    execute(DropSQL)
+                end,
+            lists:foreach(Fun, DropTableNameList),
+            ok
+    end.
+
+%% 执行截断数据库表操作
+-spec do_truncate_tables(Config :: list()) -> ok.
+do_truncate_tables(Config) ->
+    do_connect_db(),
+    Fun =
+        fun(TableInfo) ->
+            TableName = db_tools_table:get_table_name(TableInfo),
+            TruncateSQL = io_lib:format("TRUNCATE TABLE `~ts`.`~ts`;", [db_tools_dict:get_db_name(), TableName]),
+            execute(TruncateSQL)
+        end,
+    lists:foreach(Fun, Config).

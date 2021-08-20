@@ -6,12 +6,12 @@
 %%% @end
 %%% Created : 17. 8月 2021 14:34
 %%%-------------------------------------------------------------------
--module(db_tools_gen_entity).
+-module(db_tools_model).
 
 -include("db_tools.hrl").
 
 %% API
--export([do_gen_entity/1]).
+-export([do_gen_model/1]).
 
 -record(field_info, {
     name,
@@ -24,15 +24,20 @@
     field_list
 }).
 
-do_gen_entity(Config) ->
+%% 执行生成数据库表model
+-spec do_gen_model(Config :: list()) -> ok.
+do_gen_model(Config) ->
     Fun =
         fun(TableInfo) ->
             TableName = db_tools_table:get_table_name(TableInfo),
             TableComment = db_tools_table:get_table_comment(TableInfo),
             FieldInfoList = get_field_info_list(TableInfo),
             PrimaryKeyInfo = get_primary_key(TableInfo),
+            ?VERBOSE("~ts 开始生成ERL...", [TableName]),
             do_gen_erl(TableName, TableComment, FieldInfoList, PrimaryKeyInfo),
-            do_gen_hrl(TableName, TableComment, FieldInfoList)
+            ?VERBOSE("~ts 开始生成HRL...", [TableName]),
+            do_gen_hrl(TableName, TableComment, FieldInfoList),
+            ?VERBOSE("~ts 生成完毕！", [TableName])
         end,
     lists:foreach(Fun, Config).
 
@@ -192,12 +197,18 @@ gen_erl_head(TableName, TableComment, IO) ->
     io:format(IO, "%%% ~ts\n", [TableComment]),
     io:format(IO, "%%%----------------------------------------------------\n", []),
     ErlPrefix = db_tools_dict:get_erl_prefix(),
-    io:format(IO, "-module(~ts~ts).\n\n-include(\"~ts~ts.hrl\").\n\n-compile(export_all).\n\n", [ErlPrefix, TableName, ErlPrefix, TableName]).
+    io:format(IO, "-module(~ts~ts).\n\n", [ErlPrefix, TableName]),
+    io:format(IO, "-include(\"~ts~ts.hrl\").\n\n", [ErlPrefix, TableName]),
+    io:format(IO, "-compile(export_all).\n\n", []).
 
 gen_erl_new(TableName, FieldInfoList, IO) ->
-    io:format(IO, "-spec new() -> ~ts().\n", [TableName]),
-    io:format(IO, "new() -> \n\t#{\n", []),
+    io:format(IO, "-spec new_map() -> ~ts().\n", [TableName]),
+    io:format(IO, "new_map() -> \n\t#{\n", []),
     gen_new_map_field(FieldInfoList, IO),
+    io:format(IO, "\t}.\n\n", []),
+    io:format(IO, "-spec new_record() -> #~ts{}.\n", [TableName]),
+    io:format(IO, "new_record() -> \n\t#~ts{\n", [TableName]),
+    gen_new_record_field(FieldInfoList, IO),
     io:format(IO, "\t}.\n\n", []).
 
 gen_new_map_field([#field_info{name = Name, default = Default, comment = Comment} | T], IO) ->
@@ -210,6 +221,18 @@ gen_new_map_field([#field_info{name = Name, default = Default, comment = Comment
     end,
     gen_new_map_field(T, IO);
 gen_new_map_field([], _IO) ->
+    ok.
+
+gen_new_record_field([#field_info{name = Name, default = Default, comment = Comment} | T], IO) ->
+    FieldStr = lists:flatten(io_lib:format(?IF(T =/= [], "\t\t~ts = ~w,", "\t\t~ts = ~w"), [Name, Default])),
+    case Comment of
+        undefined ->
+            io:format(IO, "~ts\n", [FieldStr]);
+        Comment ->
+            io:format(IO, "~ts~ts% ~ts\n", [FieldStr, lists:duplicate(60 - length(FieldStr), " "), Comment])
+    end,
+    gen_new_record_field(T, IO);
+gen_new_record_field([], _IO) ->
     ok.
 
 gen_erl_get_fields(FieldInfoList, IO) ->
@@ -249,7 +272,8 @@ gen_hrl_head(TableName, TableComment, IO) ->
     io:format(IO, "%%%----------------------------------------------------\n", []),
     HRLPrefix = string:to_upper(db_tools_dict:get_hrl_prefix()),
     TableName1 = string:to_upper(db_tools_util:any_to_list(TableName)),
-    io:format(IO, "-ifndef(~ts~ts_HRL).\n-define(~ts~ts_HRL, true).\n\n", [HRLPrefix, TableName1, HRLPrefix, TableName1]),
+    io:format(IO, "-ifndef(~ts~ts_HRL).\n", [HRLPrefix, TableName1]),
+    io:format(IO, "-define(~ts~ts_HRL, true).\n\n", [HRLPrefix, TableName1]),
     io:format(IO, "-define(~ts~ts, ~ts).\n\n", [HRLPrefix, TableName1, TableName]).
 
 gen_hrl_spec(TableName, FieldInfoList, IO) ->

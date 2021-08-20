@@ -10,13 +10,20 @@
 %%====================================================================
 %% escript Entry point
 main(Args) ->
-    case os:type() of
-        {win32, nt} ->
-            os:cmd("chcp 65001");
-        _ ->
-            ok
+    try
+        case os:type() of
+            {win32, nt} ->
+                os:cmd("chcp 65001");
+            _ ->
+                ok
+        end,
+        do_main(Args)
+    catch
+        throw:Reason ->
+            ?CONSOLE("操作执行失败！原因：~tp", [Reason]);
+        Err:Reason:Track ->
+            ?CONSOLE("Err:~w Reason:~w\nTrack:~tp", [Err, Reason, Track])
     end,
-    do_main(Args),
     erlang:halt(0).
 %%====================================================================
 %% Internal functions
@@ -32,34 +39,16 @@ do_main(Args) ->
     end.
 
 do(?MODE_UPDATE_DB) ->
-    try
-        Config = get_filename(),
-        db_tools_db_operation:do_connect_db(),
-        db_tools_db_operation:do_create_db(),
-        db_tools_db_operation:do_create_tables(Config),
-        db_tools_db_operation:do_alter_tables(Config)
-    catch
-        throw:Reason ->
-            ?CONSOLE("更新创建MySQL数据库表结构失败，原因：~ts", [Reason]);
-        Err:Reason:Track ->
-            ?CONSOLE("Err:~w Reason:~w\nTrack:~tp", [Err, Reason, Track])
-    after
-        db_tools_db_operation:do_close_io()
-    end;
+    Config = get_filename(),
+    db_tools_operation:do_update_db(Config);
 
 do(?MODE_TRUNCATE_DB) ->
-    ok;
+    Config = get_filename(),
+    db_tools_operation:do_truncate_tables(Config);
 
-do(?MODE_GEN_ENTITY) ->
-    try
-        Config = get_filename(),
-        db_tools_gen_entity:do_gen_entity(Config)
-    catch
-        throw:Reason ->
-            ?CONSOLE("生成Erlang实体文件失败，原因：~ts", [Reason]);
-        Err:Reason:Track ->
-            ?CONSOLE("Err:~w Reason:~w\nTrack:~tp", [Err, Reason, Track])
-    end .
+do(?MODE_GEN_MODEL) ->
+    Config = get_filename(),
+    db_tools_model:do_gen_model(Config).
 
 get_filename() ->
     Filename = db_tools_dict:get_config_filename(),

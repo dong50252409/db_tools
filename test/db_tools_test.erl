@@ -10,34 +10,45 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
-parse_args_test() ->
+update_db_test() ->
     ConfigFilename = "test.config",
-    DBHost = "127.0.0.1",
-    DBPort = 3306,
     DBUser = "root",
     DBPasswd = "root",
     DBName = "test_db",
     ExportFilename = "test_db.sql",
     Args = [
+        "--verbose",
+        "-m", "update_db",
+        "--character", "utf8mb4",
+        "--collation", "utf8mb4_general_ci",
         "-f", ConfigFilename,
-        "-h", DBHost,
-        "-P", integer_to_list(DBPort),
         "-u", DBUser,
         "-p", DBPasswd,
         "-n", DBName,
-        "-e", ExportFilename,
-        "--verbose",
-        "--help"
+        "-e", ExportFilename
     ],
-    ?assertMatch(help, db_tools_helper:parse_args(Args)),
-    ?assertMatch(ConfigFilename, db_tools_dict:get_config_filename()),
-    ?assertMatch(DBHost, db_tools_dict:get_db_host()),
-    ?assertMatch(DBPort, db_tools_dict:get_db_port()),
-    ?assertMatch(DBUser, db_tools_dict:get_db_user()),
-    ?assertMatch(DBPasswd, db_tools_dict:get_db_passwd()),
-    ?assertMatch(DBName, db_tools_dict:get_db_name()),
-    ?assertMatch(ExportFilename, db_tools_dict:get_export_io()),
-    ?assert(db_tools_dict:is_verbose()).
+    db_tools:main(Args).
 
-help_test() ->
-    db_tools_helper:help().
+
+truncate_db_test() ->
+    DBUser = "root",
+    DBPasswd = "root",
+    Args = [
+        "--verbose",
+        "-m", "truncate_db",
+        "-u", DBUser,
+        "-p", DBPasswd
+    ],
+    db_tools:main(Args).
+
+gen_entity_test() ->
+    Args = [
+        "--verbose",
+        "-f","test_db.config",
+        "-m", "gen_model",
+        "--out_hrl", "./hrl/",
+        "--hrl_prefix", "tbl_",
+        "--out_erl", "./erl/",
+        "--erl_prefix", "tbl_"
+    ],
+    db_tools:main(Args).

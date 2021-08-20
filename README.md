@@ -30,10 +30,11 @@ TODO
     扩展列：{extend_fields, [[name(), extend_default(), comment()], ...]}
     
     -type name() :: {name, atom()}.
-    指定表、字段、索引以及扩展字段的名称，其中索引名称可以省略，默认取第一个字段名作为其索引名称
+    指定表、字段、扩展字段的名称
     
     -type field_type() :: {type, string()}.
-    指定字段类型，理论上支持MySQL所有可用类型，直接写入相应字符即可，例如 "int(11)"、"int(11) unsigned"、"bigint(20) unsigned zerofill"、"varchar(50) COLLATE utf8mb4_bin"、"json"、"text"等
+    指定字段类型，理论上支持MySQL所有可用类型，直接写入相应字符即可
+    例如 "int(11)"、"bigint(20) unsigned zerofill"、"varchar(50) COLLATE utf8mb4_bin"、"json"、"text"等
     
     -type not_null() :: not_null.
     指定则字段不能为空，省略则可以为null
