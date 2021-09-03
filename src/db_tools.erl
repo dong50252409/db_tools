@@ -11,10 +11,10 @@
 %% escript Entry point
 main(Args) ->
     try
-        case os:type() of
-            {win32, nt} ->
+        case lists:member({encoding, latin1}, io:getopts()) andalso os:type() =:= {win32, nt} of
+            true ->
                 os:cmd("chcp 65001");
-            _ ->
+            false ->
                 ok
         end,
         do_main(Args)

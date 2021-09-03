@@ -11,21 +11,16 @@
 -include_lib("eunit/include/eunit.hrl").
 
 update_db_test() ->
-    ConfigFilename = "test.config",
-    DBUser = "root",
-    DBPasswd = "root",
-    DBName = "test_db",
-    ExportFilename = "test_db.sql",
     Args = [
         "--verbose",
         "-m", "update_db",
         "--character", "utf8mb4",
         "--collation", "utf8mb4_general_ci",
-        "-f", ConfigFilename,
-        "-u", DBUser,
-        "-p", DBPasswd,
-        "-n", DBName,
-        "-e", ExportFilename
+        "-f", "test.config",
+        "-u", "root",
+        "-p", "root",
+        "-n", "test_db",
+        "-e", "test_db.sql"
     ],
     db_tools:main(Args).
 

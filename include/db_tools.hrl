@@ -23,3 +23,16 @@
 -define(MODE_UPDATE_DB, 1).     % 更新数据库以及表结构
 -define(MODE_TRUNCATE_DB, 2).   % 截断数据库表（清库）
 -define(MODE_GEN_MODEL, 3).    % 生成Erlang数据库表实体文件
+
+
+-record(field_info, {
+    name,
+    default,
+    type,
+    comment,
+    to_term
+}).
+
+-record(primary_key_info, {
+    field_list
+}).

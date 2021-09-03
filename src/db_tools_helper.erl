@@ -102,7 +102,7 @@ help() ->
         "   --out_hrl                   指定HRL文件输出位置（默认：当前目录）",
         "   --hrl_prifix                指定统一增加HRL文件前缀",
         "   --out_erl                   指定ERL文件输出位置（默认：当前目录）",
-        "   --erl_prifix                指定统一增加ERL文件浅醉"
+        "   --erl_prifix                指定统一增加ERL文件前缀"
     ],
     Str = io_lib:format(lists:flatten(lists:join("\n", Help)), [?DEFAULT_HOST, ?DEFAULT_PORT]),
     ?CONSOLE("~ts", [Str]).
