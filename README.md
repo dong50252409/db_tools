@@ -16,15 +16,18 @@ MySQL数据库表结构自动更新管理工具
 配置文件定义
 ---
 
-    [[表选项, 表字段列, 索引列, 扩展字段列], ...].
+    [[表选项, 表字段列, 索引列, 扩展字段列], ...]
+    其中表选项、表字段、索引列用于生成创建、修改数据库表的SQL语句
+    扩展列用于生成model文件中的额外字段
+
     表选项：{table, [name(), comment()]}
-    表字段：{fields, [[name(), field_type(), not_null(), auto_inc(), field_default(), comment()], ...]}
+    表字段：{fields, [[name(), field_type(), not_null(), auto_inc(), field_default(), comment(), to_term()], ...]}
     索引列：{index, [[index_fields(), index_type()], ...]}
     扩展列：{extend_fields, [[name(), extend_default(), comment()], ...]}
     
     -type name() :: {name, atom()}.
     指定表、字段、扩展字段的名称
-    
+
     -type field_type() :: {type, string()}.
     指定字段类型，理论上支持MySQL所有可用类型，直接写入相应字符即可
     例如 "int(11)"、"bigint(20) unsigned zerofill"、"varchar(50) COLLATE utf8mb4_bin"、"json"、"text"等
@@ -47,6 +50,9 @@ MySQL数据库表结构自动更新管理工具
     -type comment() :: {comment, string()}.
     指定表、字段以及扩展字段的注释，省略则为空
     
+    -type to_term() :: to_term.
+    指定将json、text、blob类型的字段转为Erlang term
+    
     -type extend_default() :: {default, any()}.
     指定扩展字段默认值，可使用所有Erlang中允许的数据类型，省略则为undefined
 
@@ -57,16 +63,17 @@ MySQL数据库表结构自动更新管理工具
             {table, [{name, test_1}, {comment, "测试表1"}]},
             {fields, [
                 [{name, field_1}, {type, "bigint(20) unsigned zerofill"}, not_null, auto_inc, {comment, "字段1"}],
-                [{name, field_2}, {type, "varchar(50)"}, not_null, {default, ""}, {comment, "字段2"}],
-                [{name, field_3}, {type, "tinyint(3) unsigned"}, not_null, {default, 0}, {comment, "字段3"}],
-                [{name, field_4}, {type, "int(11)"}, not_null, {comment, "字段4"}],
-                [{name, field_5}, {type, "json"}, not_null, {comment, "字段5"}],
-                [{name, field_6}, {type, "text"}, not_null, {comment, "字段6"}]
+                [{name, field_2}, {type, "tinyint(3) unsigned"}, not_null, {comment, "字段2"}],
+                [{name, field_3}, {type, "varchar(50)"}, not_null, {default, ""}, {comment, "字段3"}],
+                [{name, field_4}, {type, "int(11)"}, not_null, {default, 0}, {comment, "字段4"}],
+                [{name, field_5}, {type, "json"}, not_null, {comment, "字段5"}, to_term],
+                [{name, field_6}, {type, "text"}, not_null, {comment, "字段6"}, to_term],
+                [{name, field_7}, {type, "blob"}, not_null, {comment, "字段6"}, to_term]
             ]},
             {index, [
-                [{fields, [field_1]}, primary],
-                [{fields, [field_3, field_4]}, normal],
-                [{fields, [field_2]}, unique]
+                [{fields, [field_1, field_2]}, primary],
+                [{fields, [field_3]}, unique],
+                [{fields, [field_4]}, normal]
             ]},
             {extend_fields, [
                 [{name, ext_field_1}, {default, 0}, {comment, "扩展字段1"}],
@@ -75,22 +82,21 @@ MySQL数据库表结构自动更新管理工具
                 [{name, ext_field_4}, {default, <<>>}, {comment, "扩展字段4"}]
             ]}
         ],
-            
-        %% 这个是简略版
         [
             {table, [{name, test_2}, {comment, "测试表2"}]},
             {fields, [
-                [{name, field_1}, {type, "bigint(20) unsigned zerofill"}, not_null],
-                [{name, field_2}, {type, "varchar(50)"}],
-                [{name, field_3}, {type, "tinyint(3) unsigned"}],
+                [{name, field_1}, {type, "bigint(20) unsigned zerofill"}, not_null, auto_inc],
+                [{name, field_2}, {type, "tinyint(3) unsigned"}, not_null],
+                [{name, field_3}, {type, "varchar(50)"}],
                 [{name, field_4}, {type, "int(11)"}],
-                [{name, field_5}, {type, "json"}],
-                [{name, field_6}, {type, "text"}]
+                [{name, field_5}, {type, "json"}, to_term],
+                [{name, field_6}, {type, "text"}, to_term],
+                [{name, field_7}, {type, "blob"}, to_term]
             ]},
             {index, [
-                [{fields, [field_1]}, primary],
-                [{fields, [field_3, field_4]}],
-                [{fields, [field_2]}, unique]
+                [{fields, [field_1, field_2]}, primary],
+                [{fields, [field_3]}, unique],
+                [{fields, [field_4]}]
             ]},
             {extend_fields, [
                 [{name, ext_field_1}],
