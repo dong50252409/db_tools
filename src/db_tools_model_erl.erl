@@ -24,6 +24,7 @@ do_gen_erl(TableName, TableComment, TableFieldInfoList, ExtentFieldInfoList, _Pr
     gen_as_map(TableName, TableFieldInfoList, IO),
     gen_as_record(TableName, TableFieldInfoList, IO),
     gen_get_table_field_list(TableFieldInfoList, IO),
+    gen_get_table_index_list(TableName, TableFieldInfoList, IO),
     gen_get_table_values(TableName, TableFieldInfoList, IO).
 
 gen_head(TableName, TableComment, IO) ->
@@ -143,6 +144,12 @@ gen_get_table_field_list(TableFieldInfoList, IO) ->
     NameStrList = [Name || #field_info{name = Name} <- TableFieldInfoList],
     Body = io_lib:format("[~ts]", [lists:join(", ", NameStrList)]),
     io:format(IO, "get_table_field_list() ->~n    ~ts.~n~n", [pretty_print(Body)]).
+
+gen_get_table_index_list(TableName, TableFieldInfoList, IO) ->
+    io:format(IO, "-spec get_table_index_list() -> list().~n", []),
+    NameStrList = [["#", TableName, ".", Name] || #field_info{name = Name} <- TableFieldInfoList],
+    Body = io_lib:format("[~ts]", [lists:join(", ", NameStrList)]),
+    io:format(IO, "get_table_index_list() ->~n    ~ts.~n~n", [pretty_print(Body)]).
 
 gen_get_table_values(TableName, TableFieldInfoList, IO) ->
     io:format(IO, "-spec get_table_values(~ts()|#~ts{}) -> list().~n", [TableName, TableName]),
