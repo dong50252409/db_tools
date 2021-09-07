@@ -81,10 +81,10 @@ gen_new_record_body([], _IO) ->
 gen_as_map(TableName, TableFieldInfoList, IO) ->
     io:format(IO, "-spec as_map(list()) -> ~ts().~n", [TableName]),
     FuncName = io_lib:format("as_map([~ts]) ->", [gen_as_head(1, length(TableFieldInfoList))]),
-    io:format(IO, "~ts~n", [pretty_print(FuncName)]),
+    io:format(IO, "~ts~n", [pretty_print(FuncName, 4)]),
     io:format(IO, "    Map = new_map(),~n", []),
     Body = gen_as_map_body(TableFieldInfoList, 1),
-    io:format(IO, "    Map#{~n~ts~n    }.~n~n", [pretty_print(Body, 8)]),
+    io:format(IO, "    Map#{~n        ~ts~n    }.~n~n", [pretty_print(Body, 8)]),
     ok.
 
 gen_as_head(Max, Max) ->
@@ -108,16 +108,16 @@ gen_as_map_body([#field_info{name = Name, type = Type, to_term = ToTerm} | T], N
         [] ->
             [Str1, Str2];
         _ ->
-            [Str1, Str2, io_lib:format(",~n", []) | gen_as_map_body(T, N + 1)]
+            [Str1, Str2, io_lib:format(", ", []) | gen_as_map_body(T, N + 1)]
     end.
 
 gen_as_record(TableName, TableFieldInfoList, IO) ->
     io:format(IO, "-spec as_record(list()) -> #~ts{}.~n", [TableName]),
     FuncName = io_lib:format("as_record([~ts]) ->", [gen_as_head(1, length(TableFieldInfoList))]),
-    io:format(IO, "~ts~n", [pretty_print(FuncName)]),
+    io:format(IO, "~ts~n", [pretty_print(FuncName, 4)]),
     io:format(IO, "    Record = new_record(),~n", []),
     Body = gen_as_record_body(TableFieldInfoList, 1),
-    io:format(IO, "    Record#~ts{~n~ts~n    }.~n~n", [TableName, pretty_print(Body, 8)]),
+    io:format(IO, "    Record#~ts{~n        ~ts~n    }.~n~n", [TableName, pretty_print(Body, 8)]),
     ok.
 
 gen_as_record_body([#field_info{name = Name, type = Type, to_term = ToTerm} | T], N) ->
@@ -136,30 +136,30 @@ gen_as_record_body([#field_info{name = Name, type = Type, to_term = ToTerm} | T]
         [] ->
             [Str1, Str2];
         _ ->
-            [Str1, Str2, io_lib:format(",~n", []) | gen_as_record_body(T, N + 1)]
+            [Str1, Str2, io_lib:format(", ", []) | gen_as_record_body(T, N + 1)]
     end.
 
 gen_get_table_field_list(TableFieldInfoList, IO) ->
     io:format(IO, "-spec get_table_field_list() -> list().~n", []),
     NameStrList = [Name || #field_info{name = Name} <- TableFieldInfoList],
     Body = io_lib:format("[~ts]", [lists:join(", ", NameStrList)]),
-    io:format(IO, "get_table_field_list() ->~n    ~ts.~n~n", [pretty_print(Body)]).
+    io:format(IO, "get_table_field_list() ->~n    ~ts.~n~n", [pretty_print(Body, 8)]).
 
 gen_get_table_index_list(TableName, TableFieldInfoList, IO) ->
     io:format(IO, "-spec get_table_index_list() -> list().~n", []),
     NameStrList = [["#", TableName, ".", Name] || #field_info{name = Name} <- TableFieldInfoList],
     Body = io_lib:format("[~ts]", [lists:join(", ", NameStrList)]),
-    io:format(IO, "get_table_index_list() ->~n    ~ts.~n~n", [pretty_print(Body)]).
+    io:format(IO, "get_table_index_list() ->~n    ~ts.~n~n", [pretty_print(Body, 8)]).
 
 gen_get_table_values(TableName, TableFieldInfoList, IO) ->
     io:format(IO, "-spec get_table_values(~ts()|#~ts{}) -> list().~n", [TableName, TableName]),
     FuncName1 = io_lib:format("get_table_values(#{~ts}) ->", [gen_get_table_values_head1(TableFieldInfoList, 1)]),
-    io:format(IO, "~ts~n", [pretty_print(FuncName1)]),
-    Body = pretty_print(io_lib:format("[~ts]", [gen_get_table_values_body(TableFieldInfoList, 1)])),
+    io:format(IO, "~ts~n", [pretty_print(FuncName1, 4)]),
+    Body = pretty_print(io_lib:format("[~ts]", [gen_get_table_values_body(TableFieldInfoList, 1)]), 8),
     io:format(IO, "    ~ts;~n", [Body]),
 
     FuncName2 = io_lib:format("get_table_values(#~ts{~ts}) -> ", [TableName, gen_get_table_values_head2(TableFieldInfoList, 1)]),
-    io:format(IO, "~ts~n", [pretty_print(FuncName2)]),
+    io:format(IO, "~ts~n", [pretty_print(FuncName2, 4)]),
     io:format(IO, "    ~ts.~n", [Body]),
     ok.
 
@@ -198,8 +198,14 @@ gen_get_table_values_body([#field_info{type = Type, to_term = ToTerm} | T], N) -
     end.
 
 
-pretty_print(Str) ->
-    prettypr:format(prettypr:text_par(lists:flatten(Str), -4)).
-
-pretty_print(Str, N) ->
-    prettypr:format(prettypr:nest(N, prettypr:text_par(lists:flatten(Str)))).
+pretty_print(Str, SpecNum) ->
+    Spec = lists:duplicate(SpecNum, " "),
+    pp_1(lists:flatten(Str), Spec, 1).
+pp_1([S1, S2 | T], Spec, Count) when Count >= 60, S1 =:= $,, S2 =:= $  ->
+    [S1, "\n", Spec | pp_1(T, Spec, 1)];
+pp_1([S | T], Spec, Count) when Count >= 60, S =:= $, ->
+    [S, "\n", Spec | pp_1(T, Spec, 1)];
+pp_1([S | T], Spec, Count) ->
+    [S | pp_1(T, Spec, Count + 1)];
+pp_1([], _Spec, _Count) ->
+    [].

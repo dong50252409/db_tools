@@ -47,7 +47,7 @@ any_to_list(Any) when is_float(Any) ->
 any_to_atom(Any) when is_list(Any) ->
     list_to_atom(Any);
 any_to_atom(Any) when is_binary(Any) ->
-    binary_to_atom(Any);
+    binary_to_atom(Any, utf8);
 any_to_atom(Any) when is_atom(Any) ->
     Any;
 any_to_atom(Any) ->
