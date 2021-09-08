@@ -75,6 +75,7 @@ do_connect_db() ->
         {user, db_tools_dict:get_db_user()},
         {password, db_tools_dict:get_db_passwd()}
     ],
+    ?VERBOSE("CONNECT_DB Args:~tp", [Args]),
     case mysql:start_link(Args) of
         {ok, Conn} ->
             db_tools_dict:set_db_conn(Conn);
@@ -125,6 +126,7 @@ do_create_table(TableInfo) ->
     TableNameStr = db_tools_table:get_table_name(TableInfo),
     case is_not_table_exist(TableNameStr) of
         true ->
+            ?VERBOSE("CREATE_TABLE:~ts", [TableNameStr]),
             DBNameStr = db_tools_dict:get_db_name(),
             FieldsStr = get_fields(TableInfo),
             IndexLStr = get_index_list(TableInfo),
@@ -238,7 +240,7 @@ get_options(TableInfo) ->
     end.
 
 concat_options(TableOptions, [engine | T]) ->
-    [["ENGINE=InnoDB DEFAULT"] | concat_options(TableOptions, T)];
+    [["ENGINE=InnoDB"] | concat_options(TableOptions, T)];
 concat_options(TableOptions, [charset | T]) ->
     case db_tools_dict:get_db_character() of
         undefined ->
@@ -266,11 +268,13 @@ concat_options(_TableOptions, []) ->
 %% 执行修改表结构
 do_alter_table(TableInfo) ->
     %% 检查修改表结构
+    ?VERBOSE("ALTER_TABLE:~ts", [db_tools_table:get_table_name(TableInfo)]),
     DBFields = get_table_fields_desc(TableInfo),
     AlterFields = get_alter_fields(TableInfo, DBFields),
     lists:foreach(fun(SQL) -> execute(SQL) end, AlterFields),
 
     %% 检查修改表索引
+    ?VERBOSE("ALTER_INDEX:~ts", [db_tools_table:get_table_name(TableInfo)]),
     DBIndexList = get_table_index_desc(TableInfo),
     AlterIndexList = get_alter_index_list(TableInfo, DBIndexList),
     lists:foreach(fun(SQL) -> execute(SQL) end, AlterIndexList).
@@ -472,6 +476,7 @@ do_drop_tables(Config) ->
             DropTableNameList = lists:flatten(ValuesList) -- [db_tools_table:get_table_name(TableInfo) || TableInfo <- Config],
             Fun =
                 fun(DropTableName) ->
+                    ?VERBOSE("DROP_TABLE:~ts", [DropTableName]),
                     DropSQL = io_lib:format("DROP TABLE `~ts`.`~ts`;", [db_tools_dict:get_db_name(), DropTableName]),
                     execute(DropSQL)
                 end,
@@ -486,6 +491,7 @@ do_truncate_tables(Config) ->
     Fun =
         fun(TableInfo) ->
             TableName = db_tools_table:get_table_name(TableInfo),
+            ?VERBOSE("TRUNCATE_TABLE:~ts", [TableName]),
             TruncateSQL = io_lib:format("TRUNCATE TABLE `~ts`.`~ts`;", [db_tools_dict:get_db_name(), TableName]),
             execute(TruncateSQL)
         end,
