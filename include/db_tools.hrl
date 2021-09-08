@@ -34,5 +34,6 @@
 }).
 
 -record(primary_key_info, {
-    field_list
+    field_list = [],
+    index_list = []
 }).

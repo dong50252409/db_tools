@@ -12,7 +12,7 @@
 %% API
 -export([do_gen_erl/5]).
 
-do_gen_erl(TableName, TableComment, TableFieldInfoList, ExtentFieldInfoList, _PrimaryKeyInfo) ->
+do_gen_erl(TableName, TableComment, TableFieldInfoList, ExtentFieldInfoList, PrimaryKeyInfo) ->
     OutERL = db_tools_dict:get_out_erl(),
     ERLFilename = unicode:characters_to_binary([OutERL, db_tools_dict:get_erl_prefix(), TableName, ".erl"]),
     {ok, IO} = file:open(ERLFilename, [write, {encoding, utf8}]),
@@ -23,6 +23,8 @@ do_gen_erl(TableName, TableComment, TableFieldInfoList, ExtentFieldInfoList, _Pr
     gen_new_record(TableName, FieldInfoList, IO),
     gen_as_map(TableName, TableFieldInfoList, IO),
     gen_as_record(TableName, TableFieldInfoList, IO),
+    gen_get_table_key_field_list(PrimaryKeyInfo, IO),
+    gen_get_table_key_index_list(PrimaryKeyInfo, IO),
     gen_get_table_field_list(TableFieldInfoList, IO),
     gen_get_table_index_list(TableName, TableFieldInfoList, IO),
     gen_get_table_values(TableName, TableFieldInfoList, IO).
@@ -138,6 +140,16 @@ gen_as_record_body([#field_info{name = Name, type = Type, to_term = ToTerm} | T]
         _ ->
             [Str1, Str2, io_lib:format(", ", []) | gen_as_record_body(T, N + 1)]
     end.
+
+gen_get_table_key_field_list(PrimaryKeyInfo, IO) ->
+    io:format(IO, "-spec get_table_key_filed_list() -> list().~n", []),
+    FieldList = PrimaryKeyInfo#primary_key_info.field_list,
+    io:format(IO, "get_table_key_filed_list() ->~n    [~ts].~n~n", [lists:join(", ", FieldList)]).
+
+gen_get_table_key_index_list(PrimaryKeyInfo, IO) ->
+    io:format(IO, "-spec get_table_key_index_list() -> list().~n", []),
+    IndexList = PrimaryKeyInfo#primary_key_info.index_list,
+    io:format(IO, "get_table_key_index_list() ->~n    [~ts].~n~n", [lists:join(", ", IndexList)]).
 
 gen_get_table_field_list(TableFieldInfoList, IO) ->
     io:format(IO, "-spec get_table_field_list() -> list().~n", []),
