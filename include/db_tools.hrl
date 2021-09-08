@@ -12,7 +12,7 @@
 -define(VERBOSE(Str, Args), db_tools_dict:is_verbose() andalso ?CONSOLE(Str, Args)).
 -define(IF(Condition, True, False), (case Condition of true -> True; false -> False end)).
 
--define(DEFAULT_HOST, <<"127.0.0.1">>).
+-define(DEFAULT_HOST, "localhost").
 -define(DEFAULT_PORT, 3306).
 
 -define(GET_VALUE(Key, List), proplists:get_value(Key, List)).
