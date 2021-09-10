@@ -3,6 +3,13 @@ db_tools
 
 MySQL数据库表结构自动更新管理工具
 
+主要功能
+----
+* update_db 读取 **`*.config`** 文件，创建更新数据库表结构
+* truncate_db 读取 **`*.config`** 文件，并清空相关数据库表数据
+* gen_model 读取 **`*.config`** 文件，生成数据库表对应Erlang的实体文件
+* 配合 [`db`](https://github.com/dong50252409/db) 应用可实现半自动数据库持久化功能
+
 编译
 -----
 
