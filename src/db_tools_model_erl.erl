@@ -23,11 +23,11 @@ do_gen_erl(TableName, TableComment, TableFieldInfoList, ExtentFieldInfoList, Pri
     gen_new_record(TableName, FieldInfoList, IO),
     gen_as_map(TableName, TableFieldInfoList, IO),
     gen_as_record(TableName, TableFieldInfoList, IO),
-    gen_get_table_key_field_list(PrimaryKeyInfo, IO),
-    gen_get_table_key_index_list(PrimaryKeyInfo, IO),
     gen_get_table_field_list(TableFieldInfoList, IO),
-    gen_get_table_index_list(TableName, TableFieldInfoList, IO),
-    gen_get_table_values(TableName, TableFieldInfoList, IO).
+    gen_get_table_key_field_list(PrimaryKeyInfo, IO),
+    gen_get_table_key_values(TableName, PrimaryKeyInfo, TableFieldInfoList, IO),
+    gen_get_table_values(TableName, TableFieldInfoList, IO),
+    ok = file:close(IO).
 
 gen_head(TableName, TableComment, IO) ->
     io:format(IO, "%%%----------------------------------------------------~n", []),
@@ -86,8 +86,7 @@ gen_as_map(TableName, TableFieldInfoList, IO) ->
     io:format(IO, "~ts~n", [pretty_print(FuncName, 4)]),
     io:format(IO, "    Map = new_map(),~n", []),
     Body = gen_as_map_body(TableFieldInfoList, 1),
-    io:format(IO, "    Map#{~n        ~ts~n    }.~n~n", [pretty_print(Body, 8)]),
-    ok.
+    io:format(IO, "    Map#{~n        ~ts~n    }.~n~n", [pretty_print(Body, 8)]).
 
 gen_as_head(Max, Max) ->
     [io_lib:format("V~w", [Max])];
@@ -119,8 +118,7 @@ gen_as_record(TableName, TableFieldInfoList, IO) ->
     io:format(IO, "~ts~n", [pretty_print(FuncName, 4)]),
     io:format(IO, "    Record = new_record(),~n", []),
     Body = gen_as_record_body(TableFieldInfoList, 1),
-    io:format(IO, "    Record#~ts{~n        ~ts~n    }.~n~n", [TableName, pretty_print(Body, 8)]),
-    ok.
+    io:format(IO, "    Record#~ts{~n        ~ts~n    }.~n~n", [TableName, pretty_print(Body, 8)]).
 
 gen_as_record_body([#field_info{name = Name, type = Type, to_term = ToTerm} | T], N) ->
     Str1 = io_lib:format("~ts = ", [Name]),
@@ -141,39 +139,40 @@ gen_as_record_body([#field_info{name = Name, type = Type, to_term = ToTerm} | T]
             [Str1, Str2, io_lib:format(", ", []) | gen_as_record_body(T, N + 1)]
     end.
 
-gen_get_table_key_field_list(PrimaryKeyInfo, IO) ->
-    io:format(IO, "-spec get_table_key_filed_list() -> list().~n", []),
-    FieldList = PrimaryKeyInfo#primary_key_info.field_list,
-    io:format(IO, "get_table_key_filed_list() ->~n    [~ts].~n~n", [lists:join(", ", FieldList)]).
-
-gen_get_table_key_index_list(PrimaryKeyInfo, IO) ->
-    io:format(IO, "-spec get_table_key_index_list() -> list().~n", []),
-    IndexList = PrimaryKeyInfo#primary_key_info.index_list,
-    io:format(IO, "get_table_key_index_list() ->~n    [~ts].~n~n", [lists:join(", ", IndexList)]).
-
 gen_get_table_field_list(TableFieldInfoList, IO) ->
     io:format(IO, "-spec get_table_field_list() -> list().~n", []),
     NameStrList = [Name || #field_info{name = Name} <- TableFieldInfoList],
     Body = io_lib:format("[~ts]", [lists:join(", ", NameStrList)]),
     io:format(IO, "get_table_field_list() ->~n    ~ts.~n~n", [pretty_print(Body, 8)]).
 
-gen_get_table_index_list(TableName, TableFieldInfoList, IO) ->
-    io:format(IO, "-spec get_table_index_list() -> list().~n", []),
-    NameStrList = [["#", TableName, ".", Name] || #field_info{name = Name} <- TableFieldInfoList],
-    Body = io_lib:format("[~ts]", [lists:join(", ", NameStrList)]),
-    io:format(IO, "get_table_index_list() ->~n    ~ts.~n~n", [pretty_print(Body, 8)]).
+gen_get_table_key_field_list(PrimaryKeyInfo, IO) ->
+    io:format(IO, "-spec get_table_key_filed_list() -> list().~n", []),
+    FieldList = PrimaryKeyInfo#primary_key_info.field_list,
+    io:format(IO, "get_table_key_filed_list() ->~n    [~ts].~n~n", [lists:join(", ", FieldList)]).
+
+gen_get_table_key_values(TableName, PrimaryKeyInfo, TableFieldInfoList, IO) ->
+    io:format(IO, "-spec get_table_key_values(~ts()|#~ts{}) -> list().~n", [TableName, TableName]),
+    TableKeyFieldInfoList = [FieldInfo || FieldInfo <- TableFieldInfoList,
+        lists:member(FieldInfo#field_info.name, PrimaryKeyInfo#primary_key_info.field_list)],
+    FuncName1 = io_lib:format("get_table_key_values(#{~ts}) ->", [gen_get_table_values_head1(TableKeyFieldInfoList, 1)]),
+    io:format(IO, "~ts~n", [pretty_print(FuncName1, 4)]),
+    Body = pretty_print(io_lib:format("[~ts]", [gen_get_table_values_body(TableKeyFieldInfoList, 1)]), 8),
+    io:format(IO, "    ~ts;~n~n", [Body]),
+
+    FuncName2 = io_lib:format("get_table_key_values(#~ts{~ts}) ->", [TableName, gen_get_table_values_head2(TableKeyFieldInfoList, 1)]),
+    io:format(IO, "~ts~n", [pretty_print(FuncName2, 4)]),
+    io:format(IO, "    ~ts.~n~n", [Body]).
 
 gen_get_table_values(TableName, TableFieldInfoList, IO) ->
     io:format(IO, "-spec get_table_values(~ts()|#~ts{}) -> list().~n", [TableName, TableName]),
     FuncName1 = io_lib:format("get_table_values(#{~ts}) ->", [gen_get_table_values_head1(TableFieldInfoList, 1)]),
     io:format(IO, "~ts~n", [pretty_print(FuncName1, 4)]),
     Body = pretty_print(io_lib:format("[~ts]", [gen_get_table_values_body(TableFieldInfoList, 1)]), 8),
-    io:format(IO, "    ~ts;~n", [Body]),
+    io:format(IO, "    ~ts;~n~n", [Body]),
 
     FuncName2 = io_lib:format("get_table_values(#~ts{~ts}) -> ", [TableName, gen_get_table_values_head2(TableFieldInfoList, 1)]),
     io:format(IO, "~ts~n", [pretty_print(FuncName2, 4)]),
-    io:format(IO, "    ~ts.~n", [Body]),
-    ok.
+    io:format(IO, "    ~ts.~n~n", [Body]).
 
 gen_get_table_values_head1([#field_info{name = Name} | T], N) ->
     case T of

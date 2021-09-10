@@ -161,7 +161,7 @@ set_out_hrl(OutHRL) ->
 get_out_hrl() ->
     case get(out_hrl) of
         undefined ->
-            ".";
+            "";
         OutHRL ->
             OutHRL
     end.

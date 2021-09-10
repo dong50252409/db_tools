@@ -172,22 +172,9 @@ get_primary_key_1(TableFields, [Index | T]) ->
     case ?IS_DEFINED(primary, Index) of
         true ->
             Fields = db_tools_table:get_index_fields(Index),
-            #primary_key_info{
-                field_list = [unicode:characters_to_binary(atom_to_list(Field)) || Field <- Fields],
-                index_list = get_primary_key_2(TableFields, Fields, 2)
-            };
+            #primary_key_info{field_list = [unicode:characters_to_binary(atom_to_list(Field)) || Field <- Fields]};
         false ->
             get_primary_key_1(TableFields, T)
     end;
 get_primary_key_1(_TableFields, []) ->
     #primary_key_info{}.
-
-get_primary_key_2([Field | T1], [Name | T2] = IndexFields, Index) ->
-    case ?GET_VALUE(name, Field) =:= Name of
-        true ->
-            [integer_to_list(Index) | get_primary_key_2(T1, T2, Index + 1)];
-        false ->
-            get_primary_key_2(T1, IndexFields, Index + 1)
-    end;
-get_primary_key_2(_, [], _Index) ->
-    [].

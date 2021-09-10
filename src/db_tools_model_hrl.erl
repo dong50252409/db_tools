@@ -21,7 +21,8 @@ do_gen_hrl(TableName, TableComment, TableFieldInfoList, ExtentFieldInfoList) ->
     gen_head(TableName, TableComment, IO),
     gen_spec(TableName, FieldInfoList, IO),
     gen_record(TableName, FieldInfoList, IO),
-    gen_tail(IO).
+    gen_tail(IO),
+    ok = file:close(IO).
 
 gen_head(TableName, TableComment, IO) ->
     io:format(IO, "%%%----------------------------------------------------~n", []),
@@ -76,4 +77,4 @@ gen_record_field([], _IO) ->
     ok.
 
 gen_tail(IO) ->
-    io:format(IO, "-endif.", []).
+    io:format(IO, "-endif.~n~n", []).
