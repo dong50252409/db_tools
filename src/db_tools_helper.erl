@@ -44,7 +44,7 @@ parse_args([Param, DBUser | T]) when Param =:= "-u"; Param =:= "--user" ->
 parse_args([Param, DBPasswd | T]) when Param =:= "-p"; Param =:= "--passwd" ->
     db_tools_dict:set_db_passwd(DBPasswd),
     parse_args(T);
-parse_args([Param, DBName | T]) when Param =:= "-n"; Param =:= "--db_name" ->
+parse_args([Param, DBName | T]) when Param =:= "-d"; Param =:= "--database" ->
     db_tools_dict:set_db_name(DBName),
     parse_args(T);
 parse_args([Param, ExportFilename | T]) when Param =:= "-e"; Param =:= "--export" ->
@@ -93,7 +93,7 @@ help() ->
         "   -P          --port          指定MySQL端口号（默认：~w）",
         "   -u          --user          指定MySQL用户名",
         "   -p          --passwd        指定MySQL密码",
-        "   -n          --db_name       指定数据库名",
+        "   -d          --database      指定数据库名",
         "   -e          --export        指定导出SQL语句的文件名（默认：不导出）",
         "   --not_del_tbl               指定更新时不删除配置表文件中不存在的数据库表，无额外参数（默认：删除配置表中不存在的数据库表）",
         "   --not_del_field             指定更新时不删除配置表文件中不存在的表字段，无额外参数（默认：删除配置表中不存在的字段）",
