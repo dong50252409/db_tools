@@ -47,12 +47,7 @@ get_field_info(Field, [type | T]) ->
     FieldInfo#field_info{type = get_field_type(TypeStr)};
 get_field_info(Field, [default | T]) ->
     FieldInfo = get_field_info(Field, T),
-    case FieldInfo of
-        #field_info{type = Type} when Type =:= "unicode:chardata()";Type =:= "binary()" ->
-            FieldInfo#field_info{default = <<>>};
-        #field_info{} ->
-            FieldInfo#field_info{default = ?GET_VALUE(default, Field)}
-    end;
+    FieldInfo#field_info{default = ?GET_VALUE(default, Field)};
 get_field_info(Field, [comment | T]) ->
     FieldInfo = get_field_info(Field, T),
     case ?GET_VALUE(comment, Field) of

@@ -146,9 +146,9 @@ gen_get_table_field_list(TableFieldInfoList, IO) ->
     io:format(IO, "get_table_field_list() ->~n    ~ts.~n~n", [pretty_print(Body, 8)]).
 
 gen_get_table_key_field_list(PrimaryKeyInfo, IO) ->
-    io:format(IO, "-spec get_table_key_filed_list() -> list().~n", []),
+    io:format(IO, "-spec get_table_key_field_list() -> list().~n", []),
     FieldList = PrimaryKeyInfo#primary_key_info.field_list,
-    io:format(IO, "get_table_key_filed_list() ->~n    [~ts].~n~n", [lists:join(", ", FieldList)]).
+    io:format(IO, "get_table_key_field_list() ->~n    [~ts].~n~n", [lists:join(", ", FieldList)]).
 
 gen_get_table_key_values(TableName, PrimaryKeyInfo, TableFieldInfoList, IO) ->
     io:format(IO, "-spec get_table_key_values(~ts()|#~ts{}) -> list().~n", [TableName, TableName]),
@@ -193,9 +193,9 @@ gen_get_table_values_head2([#field_info{name = Name} | T], N) ->
 gen_get_table_values_body([#field_info{type = Type, to_term = ToTerm} | T], N) ->
     case {Type, ToTerm} of
         {"unicode:chardata()", true} ->
-            Str = io_lib:format("db_util:term_to_binary(V~w)", [N]);
+            Str = io_lib:format("db_util:term_to_string(V~w)", [N]);
         {"binary()", true} ->
-            Str = io_lib:format("db_util:term_to_binary(V~w)", [N]);
+            Str = io_lib:format("db_util:term_to_string(V~w)", [N]);
         {"jsx:json_term()", true} ->
             Str = io_lib:format("db_util:term_to_json(V~w)", [N]);
         _ ->
