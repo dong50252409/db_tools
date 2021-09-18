@@ -455,7 +455,7 @@ compare_index(ConfIndex, []) ->
     end.
 
 compare_index_fields(ConfIndex, DBIndex) ->
-    ?IF(?GET_VALUE(fields, ConfIndex) -- ?GET_VALUE(fields, DBIndex) =:= [],
+    ?IF(lists:sort(?GET_VALUE(fields, ConfIndex)) =:= lists:sort(?GET_VALUE(fields, DBIndex)),
         true, index_fields_difference).
 
 compare_index_type(ConfIndex, DBIndex) ->
