@@ -44,7 +44,13 @@ set_config_filename(Filename) ->
     ok.
 
 get_config_filename() ->
-    ?CHECK(get(config_filename), <<"请指定配置表文件"/utf8>>).
+    Filename = ?CHECK(get(config_filename), <<"请指定配置表文件"/utf8>>),
+    case filelib:is_file(Filename) of
+        true ->
+            Filename;
+        false ->
+            throw(<<"指定配置表文件不存在"/utf8>>)
+    end.
 
 set_mode(ModeStr) ->
     case ModeStr of
@@ -56,6 +62,9 @@ set_mode(ModeStr) ->
             put(mode, Mode);
         "gen_model" ->
             Mode = ?MODE_GEN_MODEL,
+            put(mode, Mode);
+        "gen_model_by_db" ->
+            Mode = ?MODE_GEN_MODEL_BY_DB,
             put(mode, Mode);
         _ ->
             throw(<<"模式不存在"/utf8>>)

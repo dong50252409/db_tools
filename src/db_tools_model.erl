@@ -59,6 +59,8 @@ get_field_info(Field, [comment | T]) ->
 get_field_info(Field, [to_term | T]) ->
     FieldInfo = get_field_info(Field, T),
     FieldInfo#field_info{to_term = ?IS_DEFINED(to_term, Field)};
+get_field_info(Field, [_ | T]) ->
+    get_field_info(Field, T);
 get_field_info(_Field, []) ->
     #field_info{}.
 
@@ -134,8 +136,11 @@ get_extend_field_info(Field, [comment | T]) ->
             FieldInfo#field_info{comment = Comment}
     end;
 get_extend_field_info(Field, [to_term | T]) ->
-    FieldInfo = get_field_info(Field, T),
+    FieldInfo = get_extend_field_info(Field, T),
     FieldInfo#field_info{to_term = ?IS_DEFINED(to_term, Field)};
+get_extend_field_info(Field, [is_extend | T]) ->
+    FieldInfo = get_extend_field_info(Field, T),
+    FieldInfo#field_info{is_extend = true};
 get_extend_field_info(_Field, []) ->
     #field_info{}.
 

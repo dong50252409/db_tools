@@ -11,7 +11,7 @@
 -include("db_tools.hrl").
 
 %% API
--export([do_update_db/1, do_truncate_tables/1]).
+-export([do_update_db/1, do_truncate_tables/1, do_collect_datatables_config/0]).
 
 %% 执行更新数据库操作
 -spec do_update_db(Config :: list()) -> ok.
@@ -496,3 +496,41 @@ do_truncate_tables(Config) ->
             execute(TruncateSQL)
         end,
     lists:foreach(Fun, Config).
+
+do_collect_datatables_config() ->
+    do_connect_db(),
+    L = select_table_names(),
+    Config = fill_out_config(L),
+    Config.
+
+fill_out_config([[TableName, TableComment] | T]) ->
+    FieldList = select_table_field_list(TableName),
+    IndexList = select_table_index_list(TableName),
+    [
+        [
+            {table, [{name, db_tools_util:any_to_atom(TableName)}, {comment, TableComment}]},
+            {fields, FieldList},
+            {index, IndexList}
+        ]
+        | fill_out_config(T)
+    ];
+fill_out_config([]) ->
+    [].
+
+select_table_names() ->
+    DBNameStr = db_tools_dict:get_db_name(),
+    SQL = io_lib:format("SELECT `TABLE_NAME`,`TABLE_COMMENT` FROM `information_schema`.`TABLES` WHERE `TABLE_SCHEMA`='~ts';", [DBNameStr]),
+    {ok, _Fields, Rows} = query(SQL),
+    Rows.
+
+select_table_field_list(TableName) ->
+    DBNameStr = db_tools_dict:get_db_name(),
+    SQL = io_lib:format("SHOW FULL FIELDS FROM `~ts`.`~ts`;", [DBNameStr, TableName]),
+    {ok, _Fields, ValuesList} = query(SQL),
+    get_table_fields_desc_1(ValuesList).
+
+select_table_index_list(TableName) ->
+    DBNameStr = db_tools_dict:get_db_name(),
+    SQL = io_lib:format("SHOW INDEX FROM `~ts`.`~ts`;", [DBNameStr, TableName]),
+    {ok, _Fields, ValuesList} = query(SQL),
+    lists:reverse(get_table_index_desc_1(ValuesList, [])).

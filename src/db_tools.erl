@@ -48,6 +48,10 @@ do(?MODE_TRUNCATE_DB) ->
 
 do(?MODE_GEN_MODEL) ->
     Config = get_filename(),
+    db_tools_model:do_gen_model(Config);
+
+do(?MODE_GEN_MODEL_BY_DB) ->
+    Config = db_tools_operation:do_collect_datatables_config(),
     db_tools_model:do_gen_model(Config).
 
 get_filename() ->

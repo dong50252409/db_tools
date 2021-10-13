@@ -20,9 +20,10 @@
 -define(IS_DEFINED(Key, List), proplists:is_defined(Key, List)).
 
 %% 工具运行模式
--define(MODE_UPDATE_DB, 1).     % 更新数据库以及表结构
--define(MODE_TRUNCATE_DB, 2).   % 截断数据库表（清库）
--define(MODE_GEN_MODEL, 3).    % 生成Erlang数据库表实体文件
+-define(MODE_UPDATE_DB, 1).             % 根据指定的配置文件，更新数据库以及表结构
+-define(MODE_TRUNCATE_DB, 2).           % 根据指定的配置文件，截断数据库表（清库）
+-define(MODE_GEN_MODEL, 3).             % 根据指定的配置文件，生成Erlang数据库表实体文件
+-define(MODE_GEN_MODEL_BY_DB, 4).       % 根据数据库表结构，生成Erlang数据库表实体文件
 
 
 -record(field_info, {
@@ -30,7 +31,8 @@
     default,
     type,
     comment,
-    to_term
+    to_term = false,
+    is_extend = false
 }).
 
 -record(primary_key_info, {

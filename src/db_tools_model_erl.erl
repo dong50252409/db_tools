@@ -50,8 +50,8 @@ gen_new_map(TableName, FieldInfoList, IO) ->
     gen_new_map_body(FieldInfoList, IO),
     io:format(IO, "    }.~n~n", []).
 
-gen_new_map_body([#field_info{name = Name, default = Default, comment = Comment} | T], IO) ->
-    FieldStr = lists:flatten(io_lib:format(?IF(T =/= [], "        ~ts => ~w,", "        ~ts => ~w"), [Name, Default])),
+gen_new_map_body([#field_info{name = Name, default = Default, comment = Comment, is_extend = IsExtend} | T], IO) ->
+    FieldStr = lists:flatten(io_lib:format(?IF(T =/= [], "        ~ts => ~ts,", "        ~ts => ~ts"), [Name, convert_default(Default, IsExtend)])),
     case Comment of
         undefined ->
             io:format(IO, "~ts~n", [FieldStr]);
@@ -68,8 +68,8 @@ gen_new_record(TableName, FieldInfoList, IO) ->
     gen_new_record_body(FieldInfoList, IO),
     io:format(IO, "    }.~n~n", []).
 
-gen_new_record_body([#field_info{name = Name, default = Default, comment = Comment} | T], IO) ->
-    FieldStr = lists:flatten(io_lib:format(?IF(T =/= [], "        ~ts = ~w,", "        ~ts = ~w"), [Name, Default])),
+gen_new_record_body([#field_info{name = Name, default = Default, comment = Comment, is_extend = IsExtend} | T], IO) ->
+    FieldStr = lists:flatten(io_lib:format(?IF(T =/= [], "        ~ts = ~ts,", "        ~ts = ~ts"), [Name, convert_default(Default, IsExtend)])),
     case Comment of
         undefined ->
             io:format(IO, "~ts~n", [FieldStr]);
@@ -79,6 +79,21 @@ gen_new_record_body([#field_info{name = Name, default = Default, comment = Comme
     gen_new_record_body(T, IO);
 gen_new_record_body([], _IO) ->
     ok.
+
+convert_default(Default, false) when is_list(Default) ->
+    case string:to_integer(Default) of
+        {Integer, []} when is_integer(Integer) ->
+            Default;
+        _ ->
+            case string:to_float(Default) of
+                {Float, []} when is_float(Float) ->
+                    Default;
+                _ ->
+                    io_lib:format("<<\"~ts\"/utf8>>", [unicode:characters_to_binary(Default)])
+            end
+    end;
+convert_default(Default, _) ->
+    io_lib:format("~w", [Default]).
 
 gen_as_map(TableName, TableFieldInfoList, IO) ->
     io:format(IO, "-spec as_map(list()) -> ~ts().~n", [TableName]),
