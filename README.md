@@ -3,13 +3,6 @@ db_tools
 
 MySQL数据库表结构自动更新管理工具
 
-主要功能
-----
-* update_db 读取 **`*.config`** 文件，创建更新数据库表结构
-* truncate_db 读取 **`*.config`** 文件，并清空相关数据库表数据
-* gen_model 读取 **`*.config`** 文件，生成数据库表对应Erlang的实体文件
-* 配合 [`db`](https://github.com/dong50252409/db) 应用可实现半自动数据库持久化功能
-
 编译
 -----
 
@@ -20,20 +13,29 @@ MySQL数据库表结构自动更新管理工具
 
     $ _build/default/bin/db_tools --help
 
+主要模式功能
+----
+
+* `update_db` 读取指定的配置文件，创建更新数据库表结构
+* `truncate_db` 读取指定的配置文件，并清空相关数据库表数据
+* `gen_model` 读取指定的配置文件，生成数据库表对应Erlang的实体文件
+* `gen_model_by_db` 读取指定的数据库表结构信息，生成数据库表对应Erlang的实体文件，（该方式无法使用`to_term`和`extend_fields`所附带的功能）
+* 配合 [`db`](https://github.com/dong50252409/db) 应用可实现自动的表数据持久化功能
+
 配置文件定义
 ---
 
-**[[表选项, 表字段列, 索引列, 扩展字段列], ...]**
+`[[表选项, 表字段列, 索引列, 扩展字段列], ...]`
 
-其中**表选项**、**表字段**、**索引列**用于生成创建、修改数据库表的SQL语句，**扩展列**用于生成model文件中的额外字段
+其中`表选项`、`表字段`、`索引列`用于生成创建、修改数据库表的SQL语句，`扩展列`用于生成model文件中的额外字段
 
-**表选项**：`{table, [name(), comment()]}`
+`表选项`：`{table, [name(), comment()]}`
 
-**表字段**：`{fields, [[name(), field_type(), not_null(), auto_inc(), field_default(), comment(), to_term()], ...]}`
+`表字段`：`{fields, [[name(), field_type(), not_null(), auto_inc(), field_default(), comment(), to_term()], ...]}`
 
-**索引列**：`{index, [[index_fields(), index_type()], ...]}`
+`索引列`：`{index, [[index_fields(), index_type()], ...]}`
 
-**扩展列**：`{extend_fields, [[name(), extend_default(), comment()], ...]}`
+`扩展列`：`{extend_fields, [[name(), extend_default(), comment()], ...]}`
 
 `-type name() :: {name, atom()}.`
 
@@ -41,8 +43,8 @@ MySQL数据库表结构自动更新管理工具
 
 `-type field_type() :: {type, string()}.`
 
-指定字段类型，理论上支持MySQL所有可用类型，直接写入相应字符即可
-例如 "int(11)"、"bigint(20) unsigned zerofill"、"varchar(50) COLLATE utf8mb4_bin"、"json"、"text"等
+指定字段类型，理论上支持MySQL所有可用类型，直接写入相应字符即可 例如 **"int(11)"、"bigint(20) unsigned zerofill"、"varchar(50) COLLATE utf8mb4_bin"、"
+json"、"text"** 等
 
 `-type not_null() :: not_null.`
 
@@ -50,7 +52,7 @@ MySQL数据库表结构自动更新管理工具
 
 `-type auto_inc() :: auto_inc.`
 
-指定则字段自动递增，auto_inc()和field_default()只能使用其中一个选项，且字段必须为主键
+指定则字段自动递增，`auto_inc()`和`field_default()`只能使用其中一个选项，且字段必须为主键
 
 `-type field_default() :: {default, number() | string()}.`
 
@@ -62,7 +64,7 @@ MySQL数据库表结构自动更新管理工具
 
 `-type index_type() :: primary | unique | normal.`
 
-指定索引类型，省略则取值为normal
+指定索引类型，省略则取值为`normal`
 
 `-type comment() :: {comment, string()}.`
 
@@ -70,14 +72,15 @@ MySQL数据库表结构自动更新管理工具
 
 `-type to_term() :: to_term.`
 
-指定将json、text、blob类型的字段转为Erlang term
+指定将 **json、text、blob** 类型的字段转为Erlang term
 
 `-type extend_default() :: {default, any()}.`
 
-指定扩展字段默认值，可使用所有Erlang中允许的数据类型，省略则为undefined
+指定扩展字段默认值，可使用所有Erlang中允许的数据类型，省略则为`undefined`
 
 简单的模板
 ----
+
     [
         [
             {table, [{name, test_1}, {comment, "测试表1"}]},
@@ -129,6 +132,7 @@ MySQL数据库表结构自动更新管理工具
 
 一些限制
 -----
-* 无法重命名表，因为无法从配置文件中获取原有表名，目前的做法是新建表，并删除配置表中不存在的表，可以通过在指定 **--not_del_tbl** 保留配置表中不存在的表
 
-* 无法重命名字段，因为无法配置文件中获取原有字段名，目前的做法是创建新字段，并删除配置表中不存在的字段，可以通过指定 **--not_del_field** 保留配置表中不存在的字段
+* 无法重命名表，因为无法从配置文件中获取原有表名，目前的做法是新建表，并删除配置表中不存在的表，可以通过在指定 `--not_del_tbl` 保留配置表中不存在的表
+
+* 无法重命名字段，因为无法配置文件中获取原有字段名，目前的做法是创建新字段，并删除配置表中不存在的字段，可以通过指定 `--not_del_field` 保留配置表中不存在的字段
