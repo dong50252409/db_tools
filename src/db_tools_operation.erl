@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%%% @author gz1417
+%%% @author dy
 %%% @copyright (C) 2021, <COMPANY>
 %%% @doc
 %%% 操作数据库
@@ -320,7 +320,7 @@ concat_alter_fields(PrevConfField, [ConfField | T], DBFields) ->
             [FieldStr | concat_alter_fields(ConfField, T, DBFields1)]
     end;
 concat_alter_fields(_ConfField, [], DBFields) ->
-    case db_tools_dict:is_not_del_field() of
+    case db_tools_dict:is_keep_fields() of
         true ->
             [];
         false ->
@@ -466,7 +466,7 @@ compare_index_type(ConfIndex, DBIndex) ->
 %% 执行删除多余数据库表
 -spec do_drop_tables(Config :: list()) -> ok.
 do_drop_tables(Config) ->
-    case db_tools_dict:is_not_del_tbl() of
+    case db_tools_dict:is_keep_tables() of
         true ->
             ok;
         false ->

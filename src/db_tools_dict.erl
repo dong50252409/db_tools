@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%%% @author gz1417
+%%% @author dy
 %%% @copyright (C) 2021, <COMPANY>
 %%% @doc
 %%% 进程字典封装
@@ -23,8 +23,8 @@
     set_db_passwd/1, get_db_passwd/0,
     set_db_name/1, get_db_name/0,
     set_export_filename/1, get_export_io/0,
-    set_not_del_tbl/0, is_not_del_tbl/0,
-    set_not_del_field/0, is_not_del_field/0,
+    set_keep_tables/0, is_keep_tables/0,
+    set_keep_fields/0, is_keep_fields/0,
     set_out_hrl/1, get_out_hrl/0,
     set_hrl_prefix/1, get_hrl_prefix/0,
     set_out_erl/1, get_out_erl/0,
@@ -139,19 +139,19 @@ set_export_filename(Filename) ->
     put(export_filename, IO),
     ok.
 
-set_not_del_tbl() ->
-    put(not_del_tbl, true),
+set_keep_tables() ->
+    put(keep_tables, true),
     ok.
 
-is_not_del_tbl() ->
-    ?IF(get(not_del_tbl) =:= true, true, false).
+is_keep_tables() ->
+    ?IF(get(keep_tables) =:= true, true, false).
 
-set_not_del_field() ->
-    put(not_del_field, true),
+set_keep_fields() ->
+    put(keep_fields, true),
     ok.
 
-is_not_del_field() ->
-    ?IF(get(not_del_field) =:= true, true, false).
+is_keep_fields() ->
+    ?IF(get(keep_fields) =:= true, true, false).
 
 get_export_io() ->
     get(export_filename).

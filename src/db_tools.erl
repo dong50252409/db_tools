@@ -1,3 +1,5 @@
+%% -*- erlang -*-
+%%! +pc unicode
 -module(db_tools).
 
 -include("db_tools.hrl").

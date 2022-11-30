@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%%% @author gz1417
+%%% @author dy
 %%% @copyright (C) 2021, <COMPANY>
 %%% @doc
 %%% 展示使用帮助、解析参数列表
@@ -50,11 +50,11 @@ parse_args([Param, DBName | T]) when Param =:= "-d"; Param =:= "--database" ->
 parse_args([Param, ExportFilename | T]) when Param =:= "-e"; Param =:= "--export" ->
     db_tools_dict:set_export_filename(ExportFilename),
     parse_args(T);
-parse_args(["--not_del_tbl" | T]) ->
-    db_tools_dict:set_not_del_tbl(),
+parse_args(["--keep_tables" | T]) ->
+    db_tools_dict:set_keep_tables(),
     parse_args(T);
-parse_args(["--not_del_field" | T]) ->
-    db_tools_dict:set_not_del_field(),
+parse_args(["--keep_fields" | T]) ->
+    db_tools_dict:set_keep_fields(),
     parse_args(T);
 parse_args(["--out_hrl", OutHrl | T]) ->
     db_tools_dict:set_out_hrl(OutHrl),
@@ -96,8 +96,8 @@ help() ->
         "   -p          --passwd        指定MySQL密码",
         "   -d          --database      指定数据库名",
         "   -e          --export        指定导出SQL语句的文件名（默认：不导出）",
-        "   --not_del_tbl               指定更新时不删除配置表文件中不存在的数据库表，无额外参数（默认：删除配置表中不存在的数据库表）",
-        "   --not_del_field             指定更新时不删除配置表文件中不存在的表字段，无额外参数（默认：删除配置表中不存在的字段）",
+        "   --keep_tables               更新时保留所有配置表文件中不存在的数据库表",
+        "   --keep_fields               更新时保留所有配置表文件中不存在的表字段",
         "",
         "Erlang文件生成相关可用选项",
         "   --out_hrl                   指定HRL文件输出位置（默认：当前目录）",

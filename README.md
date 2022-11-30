@@ -19,64 +19,67 @@ MySQL数据库表结构自动更新管理工具
 * `update_db` 读取指定的配置文件，创建更新数据库表结构
 * `truncate_db` 读取指定的配置文件，并清空相关数据库表数据
 * `gen_model` 读取指定的配置文件，生成数据库表对应Erlang的实体文件
-* `gen_model_by_db` 读取指定的数据库表结构信息，生成数据库表对应Erlang的实体文件，（该方式无法使用`to_term`和`extend_fields`所附带的功能）
+* `gen_model_by_db` 读取指定的数据库表结构SQL文件，生成数据库表对应Erlang的实体文件
 * 配合 [`db`](https://github.com/dong50252409/db) 应用可实现自动的表数据持久化功能
 
-配置文件定义
+文件结构定义
 ---
 
-`[[表选项, 表字段列, 索引列, 扩展字段列], ...]`
+配置表结构为
 
-其中`表选项`、`表字段`、`索引列`用于生成创建、修改数据库表的SQL语句，`扩展列`用于生成model文件中的额外字段
+```[[表选项, 表字段列, 索引列, 扩展字段列], ...]```
 
-`表选项`：`{table, [name(), comment()]}`
+**表选项**：包含数据库表名、表描述（可选）
 
-`表字段`：`{fields, [[name(), field_type(), not_null(), auto_inc(), field_default(), comment(), to_term()], ...]}`
+```
+{table, [name(), comment()]}
 
-`索引列`：`{index, [[index_fields(), index_type()], ...]}`
+-type name() :: {name, atom()}.
 
-`扩展列`：`{extend_fields, [[name(), extend_default(), comment()], ...]}`
+-type comment() :: {comment, string()}.
+```
 
-`-type name() :: {name, atom()}.`
+**表字段**：包含字段名、字段类型、非空（可选）、主键自增（可选）、默认值（可选）、描述（可选）、to_term指定则自动将数据转为Erlang项式（仅针对`json、text、blob`类型）
 
-指定表、字段、扩展字段的名称
+```
+{fields, [[name(), field_type(), not_null(), auto_inc(), field_default(), comment(), to_term()], ...]}
 
-`-type field_type() :: {type, string()}.`
+-type name() :: {name, atom()}.
 
-指定字段类型，理论上支持MySQL所有可用类型，直接写入相应字符即可 例如 **"int(11)"、"bigint(20) unsigned zerofill"、"varchar(50) COLLATE utf8mb4_bin"、"
-json"、"text"** 等
+-type field_type() :: {type, string()}.
 
-`-type not_null() :: not_null.`
+-type not_null() :: not_null.
 
-指定则字段不能为空，省略则可以为null
+-type auto_inc() :: auto_inc. 
 
-`-type auto_inc() :: auto_inc.`
+-type field_default() :: {default, number() | string()}.
 
-指定则字段自动递增，`auto_inc()`和`field_default()`只能使用其中一个选项，且字段必须为主键
+-type comment() :: {comment, string()}.
 
-`-type field_default() :: {default, number() | string()}.`
+-type to_term() :: to_term.
+```
 
-指定字段默认值，省略则无默认值
+**索引列**：包含索引字段名、索引类型（可选，默认值`normal`）
 
-`-type index_fields() :: [atom(), ...].`
+```
+{index, [[index_fields(), index_type()], ...]}
 
-指定索引字段
+-type index_fields() :: [atom(), ...].
 
-`-type index_type() :: primary | unique | normal.`
+-type index_type() :: primary | unique | normal.
+```
 
-指定索引类型，省略则取值为`normal`
+**扩展列**：包含字段名、字段默认值（可选，默认值`undefined`）、描述（可选）
 
-`-type comment() :: {comment, string()}.`
+```
+{extend_fields, [[name(), extend_default(), comment()], ...]}
 
-指定表、字段以及扩展字段的注释，省略则为空
+-type name() :: {name, atom()}.
 
-`-type to_term() :: to_term.`
+-type extend_default() :: {default, any()}.
 
-指定将 **json、text、blob** 类型的字段转为Erlang term
-
-`-type extend_default() :: {default, any()}.`
-
-指定扩展字段默认值，可使用所有Erlang中允许的数据类型，省略则为`undefined`
+-type comment() :: {comment, string()}.
+```
 
 简单的模板
 ----
@@ -133,6 +136,6 @@ json"、"text"** 等
 一些限制
 -----
 
-* 无法重命名表，因为无法从配置文件中获取原有表名，目前的做法是新建表，并删除配置表中不存在的表，可以通过在指定 `--not_del_tbl` 保留配置表中不存在的表
+* 无法重命名表，因为无法从配置文件中获取原有表名，目前的做法是新建表，并删除配置表中不存在的表，可以通过在指定 `--keep_tables` 保留配置表中不存在的表
 
-* 无法重命名字段，因为无法配置文件中获取原有字段名，目前的做法是创建新字段，并删除配置表中不存在的字段，可以通过指定 `--not_del_field` 保留配置表中不存在的字段
+* 无法重命名字段，因为无法配置文件中获取原有字段名，目前的做法是创建新字段，并删除配置表中不存在的字段，可以通过指定 `--keep_fields` 保留配置表中不存在的字段
